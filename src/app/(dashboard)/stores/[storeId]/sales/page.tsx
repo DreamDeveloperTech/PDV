@@ -117,6 +117,7 @@ export default function SalesPage({ params }: { params: Promise<{ storeId: strin
       setProducts(json.data ?? []);
     } catch {
       setProducts([]);
+      
     }
   }, [storeId]);
 
