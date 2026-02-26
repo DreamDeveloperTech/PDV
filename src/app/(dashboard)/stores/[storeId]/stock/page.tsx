@@ -48,6 +48,8 @@ export default function StockPage({ params }: { params: Promise<{ storeId: strin
   const [modalOpen, setModalOpen] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
   const [error, setError] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [form, setForm] = useState({
     productId: "",
     quantity: "",
@@ -58,8 +60,12 @@ export default function StockPage({ params }: { params: Promise<{ storeId: strin
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
+      const params = new URLSearchParams({ storeId });
+      if (from) params.set("from", from);
+      if (to) params.set("to", to);
+
       const [movRes, prodRes] = await Promise.all([
-        fetch(`/api/stock-movements?storeId=${storeId}`),
+        fetch(`/api/stock-movements?${params.toString()}`),
         fetch(`/api/products?storeId=${storeId}&pageSize=100`),
       ]);
       const movJson = await movRes.json();
@@ -71,7 +77,7 @@ export default function StockPage({ params }: { params: Promise<{ storeId: strin
     } finally {
       setLoading(false);
     }
-  }, [storeId]);
+  }, [storeId, from, to]);
 
   useEffect(() => {
     fetchData();
@@ -109,11 +115,63 @@ export default function StockPage({ params }: { params: Promise<{ storeId: strin
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Movimentações de Estoque</h1>
-        <Button onClick={() => setModalOpen(true)}>
-          <Plus size={16} className="mr-2" /> Ajustar Estoque
-        </Button>
+      <div className="mb-4 flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Movimentações de Estoque</h1>
+          <p className="text-xs text-gray-500">Filtre por dia ou período para analisar saídas e entradas.</p>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <div className="flex gap-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">De</label>
+              <input
+                type="date"
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+                className="rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">Até</label>
+              <input
+                type="date"
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+                className="rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                const today = new Date().toISOString().slice(0, 10);
+                setFrom(today);
+                setTo(today);
+              }}
+            >
+              Hoje
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                const now = new Date();
+                const start = new Date(now.getFullYear(), now.getMonth(), 1);
+                setFrom(start.toISOString().slice(0, 10));
+                setTo(now.toISOString().slice(0, 10));
+              }}
+            >
+              Mês atual
+            </Button>
+            <Button type="button" size="sm" onClick={() => setModalOpen(true)}>
+              <Plus size={16} className="mr-2" /> Ajustar Estoque
+            </Button>
+          </div>
+        </div>
       </div>
 
       <Card>

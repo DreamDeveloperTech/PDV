@@ -12,6 +12,7 @@ import { Modal } from "@/components/ui/modal";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/hooks/use-fetch";
 import { formatCurrency } from "@/lib/utils";
+import { savePdvSession, loadPdvSession, clearPdvSession } from "@/lib/pdv-storage";
 import {
   ShoppingCart,
   Plus,
@@ -38,11 +39,32 @@ interface Customer {
   blockedForCredit: boolean;
 }
 
+interface CashWithdrawalItem {
+  id: string;
+  amount: number;
+  createdAt: string;
+  user: { id: string; name: string | null; email: string };
+}
+
+interface StoreMember {
+  id: string;
+  user: { id: string; name: string | null; email: string };
+}
+
 interface CashSession {
   id: string;
   status: "OPEN" | "CLOSED";
   openingAmount: number;
   openedAt: string;
+  expectedCash?: number;
+  totalWithdrawals?: number;
+  withdrawals?: CashWithdrawalItem[];
+  currentUserName?: string;
+  currentUserId?: string;
+  /** true = caixa aberto há mais de 24h; não permite novas vendas até fechar */
+  isExpiredForSales?: boolean;
+  /** true = esta sessão já estava aberta (valor compartilhado com todos) */
+  alreadyOpen?: boolean;
 }
 
 interface CartItem {
@@ -80,17 +102,25 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
   const [payments, setPayments] = useState<PaymentEntry[]>([]);
   const [currentPaymentMethod, setCurrentPaymentMethod] = useState<string>("CASH");
   const [currentPaymentAmount, setCurrentPaymentAmount] = useState("");
+  const [changeAmount, setChangeAmount] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
 
   // Modal states
   const [openSessionModal, setOpenSessionModal] = useState(false);
   const [closeSessionModal, setCloseSessionModal] = useState(false);
+  const [sangriaModal, setSangriaModal] = useState(false);
   const [openingAmount, setOpeningAmount] = useState("0");
   const [closingAmount, setClosingAmount] = useState("0");
+  const [sangriaAmount, setSangriaAmount] = useState("");
+  const [sangriaLoading, setSangriaLoading] = useState(false);
+  const [selectedWithdrawalUserId, setSelectedWithdrawalUserId] = useState("");
+  const [storeMembers, setStoreMembers] = useState<StoreMember[]>([]);
   const [saleLoading, setSaleLoading] = useState(false);
   const [error, setError] = useState("");
+  const [sessionRestoredFromStorage, setSessionRestoredFromStorage] = useState(false);
+  const [showSharedCaixaMessage, setShowSharedCaixaMessage] = useState(false);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (isRetry = false) => {
     setLoading(true);
     try {
       const [prodRes, custRes, sessRes] = await Promise.all([
@@ -103,9 +133,58 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
       const sessJson = await sessRes.json();
       setProducts(prodJson.data || []);
       setCustomers(custJson.data || []);
-      setSession(sessJson.data);
+      const apiSession = sessRes.ok ? (sessJson.data as CashSession | null) : null;
+      setSession(apiSession);
+      setSessionRestoredFromStorage(false);
+      if (apiSession) {
+        savePdvSession(storeId, {
+          sessionId: apiSession.id,
+          status: apiSession.status,
+          openingAmount: apiSession.openingAmount,
+          expectedCash: apiSession.expectedCash,
+          openedAt: apiSession.openedAt,
+          currentUserId: apiSession.currentUserId,
+          currentUserName: apiSession.currentUserName,
+          isExpiredForSales: apiSession.isExpiredForSales,
+        });
+      } else {
+        clearPdvSession(storeId);
+        if (!isRetry) {
+          const stored = loadPdvSession(storeId);
+          if (stored) {
+            setSession({
+              id: stored.sessionId,
+              status: stored.status,
+              openingAmount: stored.openingAmount,
+              openedAt: stored.openedAt,
+              expectedCash: stored.expectedCash,
+              currentUserId: stored.currentUserId,
+              currentUserName: stored.currentUserName,
+              isExpiredForSales: stored.isExpiredForSales,
+            });
+            setSessionRestoredFromStorage(true);
+            setTimeout(() => fetchData(true), 2000);
+          }
+        }
+      }
     } catch {
-      // Silent
+      if (!isRetry) {
+        const stored = loadPdvSession(storeId);
+        if (stored) {
+          setSession({
+            id: stored.sessionId,
+            status: stored.status,
+            openingAmount: stored.openingAmount,
+            openedAt: stored.openedAt,
+            expectedCash: stored.expectedCash,
+            currentUserId: stored.currentUserId,
+            currentUserName: stored.currentUserName,
+            isExpiredForSales: stored.isExpiredForSales,
+          });
+          setSessionRestoredFromStorage(true);
+          setTimeout(() => fetchData(true), 2000);
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -115,6 +194,15 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
     fetchData();
   }, [fetchData]);
 
+  // Carrega membros da loja ao abrir o modal de sangria (para o select "Quem está retirando")
+  useEffect(() => {
+    if (!sangriaModal || !storeId) return;
+    fetch(`/api/store-users?storeId=${storeId}`)
+      .then((res) => res.json())
+      .then((json) => setStoreMembers(json.data ?? []))
+      .catch(() => setStoreMembers([]));
+  }, [sangriaModal, storeId]);
+
   // Cart calculations
   const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
   const total = subtotal - discount;
@@ -122,32 +210,51 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
   const remaining = total - paymentTotal;
 
   function addToCart(product: Product) {
+    const existingInCart = cart.find((item) => item.productId === product.id);
+    const currentQty = existingInCart?.quantity ?? 0;
+
+    if (currentQty >= product.stock) {
+      setError(`Estoque insuficiente para ${product.name}. Disponível: ${product.stock}`);
+      return;
+    }
+
     setCart((prev) => {
       const existing = prev.find((item) => item.productId === product.id);
       if (existing) {
+        const newQty = existing.quantity + 1;
         return prev.map((item) =>
           item.productId === product.id
-            ? { ...item, quantity: item.quantity + 1, total: (item.quantity + 1) * item.price }
+            ? { ...item, quantity: newQty, total: newQty * item.price }
             : item
         );
       }
-      return [...prev, {
-        productId: product.id,
-        name: product.name,
-        price: product.price,
-        quantity: 1,
-        total: product.price,
-      }];
+      return [
+        ...prev,
+        {
+          productId: product.id,
+          name: product.name,
+          price: product.price,
+          quantity: 1,
+          total: product.price,
+        },
+      ];
     });
   }
 
   function updateCartQuantity(productId: string, delta: number) {
+    const product = products.find((p) => p.id === productId);
     setCart((prev) =>
       prev
         .map((item) => {
           if (item.productId !== productId) return item;
           const newQty = item.quantity + delta;
           if (newQty <= 0) return null;
+
+          if (product && newQty > product.stock) {
+            setError(`Estoque insuficiente para ${product.name}. Disponível: ${product.stock}`);
+            return item;
+          }
+
           return { ...item, quantity: newQty, total: newQty * item.price };
         })
         .filter(Boolean) as CartItem[]
@@ -162,10 +269,27 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
     const amount = Number(currentPaymentAmount);
     if (amount <= 0) return;
 
-    setPayments((prev) => [
-      ...prev,
-      { method: currentPaymentMethod as PaymentEntry["method"], amount },
-    ]);
+    const method = currentPaymentMethod as PaymentEntry["method"];
+    const remainingBefore = remaining;
+
+    // For cash payments, allow customer to give more than the remaining amount
+    if (method === "CASH" && remainingBefore > 0 && amount >= remainingBefore) {
+      const usedAmount = remainingBefore;
+      const troco = amount - remainingBefore;
+
+      setPayments((prev) => [
+        ...prev,
+        { method, amount: usedAmount },
+      ]);
+      setChangeAmount(troco);
+    } else {
+      setPayments((prev) => [
+        ...prev,
+        { method, amount },
+      ]);
+      setChangeAmount(0);
+    }
+
     setCurrentPaymentAmount("");
   }
 
@@ -179,6 +303,7 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
         body: { openingAmount: Number(openingAmount) || 0 },
       });
       setSession(result);
+      if (result.alreadyOpen) setShowSharedCaixaMessage(true);
       setOpenSessionModal(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao abrir caixa");
@@ -193,9 +318,40 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
         body: { closingAmount: Number(closingAmount) || 0 },
       });
       setSession(null);
+      clearPdvSession(storeId);
       setCloseSessionModal(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao fechar caixa");
+    }
+  }
+
+  async function handleSangria() {
+    if (!session || !sangriaAmount || Number(sangriaAmount) <= 0) return;
+    const amount = Number(sangriaAmount);
+    const available = session.expectedCash ?? session.openingAmount;
+    if (amount > available + 0.01) {
+      setError(`Valor maior que o disponível em caixa (${formatCurrency(available)})`);
+      return;
+    }
+    setSangriaLoading(true);
+    setError("");
+    try {
+      await apiRequest(`/api/cash-sessions/withdraw?storeId=${storeId}`, {
+        method: "POST",
+        body: {
+          sessionId: session.id,
+          amount,
+          withdrawnUserId: selectedWithdrawalUserId || undefined,
+        },
+      });
+      setSangriaAmount("");
+      setSelectedWithdrawalUserId(session.currentUserId ?? "");
+      setSangriaModal(false);
+      fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao registrar sangria");
+    } finally {
+      setSangriaLoading(false);
     }
   }
 
@@ -228,6 +384,7 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
       setPayments([]);
       setDiscount(0);
       setSelectedCustomer("");
+      setChangeAmount(0);
       setError("");
 
       // Refresh products (stock updated)
@@ -278,35 +435,73 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
   }
 
   return (
-    <div className="flex gap-6 h-[calc(100vh-5rem)]">
+    <div className="flex flex-col gap-4 md:grid md:grid-cols-[1fr_minmax(400px,440px)] md:gap-6 md:h-[calc(100vh-5rem)]">
+      {sessionRestoredFromStorage && (
+        <div className="md:col-span-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Restaurado do último acesso. Reconectando ao servidor…
+        </div>
+      )}
+      {showSharedCaixaMessage && (
+        <div className="md:col-span-2 flex items-center justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+          <span>O caixa já estava aberto. O valor em caixa é compartilhado com todos os colaboradores.</span>
+          <button type="button" onClick={() => setShowSharedCaixaMessage(false)} className="shrink-0 font-medium hover:underline">
+            Fechar
+          </button>
+        </div>
+      )}
       {/* Left: Product search and grid */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between mb-4">
+      <div className="flex min-w-0 flex-col overflow-hidden">
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-xl font-bold text-gray-900">PDV</h1>
-          <div className="flex items-center gap-2">
-            <Badge variant="success">Caixa Aberto</Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="rounded-lg bg-gray-100 px-3 py-1.5 text-sm text-gray-700">
+              <span className="font-medium">Em caixa:</span>{" "}
+              {formatCurrency(session.expectedCash ?? session.openingAmount)}
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setSangriaModal(true);
+                setSelectedWithdrawalUserId(session?.currentUserId ?? "");
+              }}
+            >
+              <Banknote size={16} className="mr-1" />
+              Sangria
+            </Button>
+            {session.isExpiredForSales ? (
+              <Badge variant="danger">Caixa &gt; 24h – vendas bloqueadas</Badge>
+            ) : (
+              <Badge variant="success">Caixa Aberto</Badge>
+            )}
             <Button variant="danger" size="sm" onClick={() => setCloseSessionModal(true)}>
               Fechar Caixa
             </Button>
           </div>
         </div>
 
+        {session.isExpiredForSales && (
+          <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            <strong>Este caixa está aberto há mais de 24h.</strong> Feche-o e abra um novo para continuar vendendo.
+          </div>
+        )}
+
         {/* Search */}
         <Input
           placeholder="Buscar produto por nome ou código de barras..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="mb-4"
+          className="mb-3"
         />
 
         {/* Product grid */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+        <div className="max-h-[340px] overflow-y-auto rounded-lg bg-white p-2 md:max-h-none md:flex-1 md:min-h-0 md:p-0 md:bg-transparent">
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4">
             {filteredProducts.map((product) => (
               <button
                 key={product.id}
                 onClick={() => addToCart(product)}
-                disabled={product.stock <= 0}
+                disabled={product.stock <= 0 || session.isExpiredForSales}
                 className="rounded-lg border border-gray-200 bg-white p-3 text-left hover:border-blue-300 hover:shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
@@ -318,18 +513,18 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
         </div>
       </div>
 
-      {/* Right: Cart */}
-      <div className="w-96 flex flex-col border-l border-gray-200 pl-6">
-        <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+      {/* Right: Cart - mais espaço no desktop */}
+      <div className="mt-2 flex min-w-0 flex-col rounded-lg border border-gray-200 bg-white p-4 md:mt-0 md:min-h-0 md:border-l md:border-t-0 md:bg-transparent md:pl-6 md:pr-0 md:pt-0 md:pb-0">
+        <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-gray-900">
           <ShoppingCart size={20} /> Carrinho
         </h2>
 
         {error && (
-          <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600 mb-4">{error}</div>
+          <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</div>
         )}
 
-        {/* Cart items */}
-        <div className="flex-1 overflow-y-auto space-y-2 mb-4">
+        {/* Cart items - altura mínima no desktop para ver vários itens e scroll visível */}
+        <div className="pdv-cart-items-scroll mb-4 max-h-64 flex-1 space-y-2 overflow-y-auto md:min-h-[320px] md:max-h-[50vh] md:flex-none">
           {cart.length === 0 ? (
             <p className="text-sm text-gray-400 text-center py-8">Carrinho vazio</p>
           ) : (
@@ -436,8 +631,13 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
           </div>
 
           {remaining > 0.01 && (
-            <p className="text-sm text-yellow-600 mt-2">
+            <p className="mt-2 text-sm text-yellow-600">
               Faltam: {formatCurrency(remaining)}
+            </p>
+          )}
+          {remaining <= 0.01 && changeAmount > 0 && (
+            <p className="mt-2 text-sm text-green-700">
+              Troco: {formatCurrency(changeAmount)}
             </p>
           )}
 
@@ -466,8 +666,8 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
         <Button
           onClick={handleFinalizeSale}
           loading={saleLoading}
-          disabled={cart.length === 0 || Math.abs(remaining) > 0.01}
-          className="w-full"
+          disabled={cart.length === 0 || Math.abs(remaining) > 0.01 || session.isExpiredForSales}
+          className="w-full mb-2 md:mb-0"
           size="lg"
         >
           <DollarSign size={18} className="mr-2" />
@@ -475,9 +675,83 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
         </Button>
       </div>
 
+      {/* Sangria modal */}
+      <Modal
+        isOpen={sangriaModal}
+        onClose={() => {
+          setSangriaModal(false);
+          setSangriaAmount("");
+          setSelectedWithdrawalUserId("");
+          setError("");
+        }}
+        title="Sangria (retirada de caixa)"
+      >
+        <div className="space-y-4">
+          <div className="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
+            <p>
+              <span className="font-medium">Total em caixa:</span>{" "}
+              {formatCurrency(session.expectedCash ?? session.openingAmount)}
+            </p>
+          </div>
+          <Select
+            label="Quem está retirando"
+            value={selectedWithdrawalUserId}
+            onChange={(e) => setSelectedWithdrawalUserId(e.target.value)}
+            options={storeMembers.map((m) => ({
+              value: m.user.id,
+              label: m.user.name || m.user.email || m.user.id,
+            }))}
+            placeholder="Selecione a pessoa"
+          />
+          <Input
+            label="Valor a retirar (R$)"
+            type="number"
+            step="0.01"
+            min="0.01"
+            placeholder="0,00"
+            value={sangriaAmount}
+            onChange={(e) => setSangriaAmount(e.target.value)}
+          />
+          {session.withdrawals && session.withdrawals.length > 0 && (
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">Sangrias desta sessão</p>
+              <ul className="max-h-32 overflow-y-auto rounded border border-gray-200 divide-y divide-gray-100 text-sm">
+                {session.withdrawals.map((w) => (
+                  <li key={w.id} className="flex justify-between items-center px-3 py-2">
+                    <span className="text-gray-600">{w.user.name || w.user.email}</span>
+                    <span className="font-medium">{formatCurrency(w.amount)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {error && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+          <Button
+            onClick={handleSangria}
+            loading={sangriaLoading}
+            disabled={
+              !sangriaAmount ||
+              Number(sangriaAmount) <= 0 ||
+              !selectedWithdrawalUserId
+            }
+            className="w-full"
+          >
+            Confirmar sangria
+          </Button>
+        </div>
+      </Modal>
+
       {/* Close session modal */}
       <Modal isOpen={closeSessionModal} onClose={() => setCloseSessionModal(false)} title="Fechar Caixa">
         <div className="space-y-4">
+          {session && (
+            <div className="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
+              <p>
+                <span className="font-medium">Deveria haver em caixa:</span>{" "}
+                {formatCurrency(session.expectedCash ?? session.openingAmount)}
+              </p>
+            </div>
+          )}
           <Input
             label="Valor em Caixa (R$)"
             type="number"
@@ -486,7 +760,20 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
             value={closingAmount}
             onChange={(e) => setClosingAmount(e.target.value)}
           />
-          <Button onClick={handleCloseSession} variant="danger" className="w-full">
+          {session && Number(closingAmount) > 0 && Number(closingAmount) < (session.expectedCash ?? session.openingAmount) - 0.01 && (
+            <p className="text-sm text-red-600">
+              O valor informado é menor que o esperado. Não é possível fechar o caixa.
+            </p>
+          )}
+          <Button
+            onClick={handleCloseSession}
+            variant="danger"
+            className="w-full"
+            disabled={
+              !session ||
+              Number(closingAmount || 0) < (session.expectedCash ?? session.openingAmount) - 0.01
+            }
+          >
             Confirmar Fechamento
           </Button>
         </div>

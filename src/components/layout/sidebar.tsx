@@ -13,9 +13,11 @@ import {
   ShoppingCart,
   Receipt,
   Store,
-  LogOut,
   ArrowLeftRight,
+  Banknote,
+  ListOrdered,
 } from "lucide-react";
+import { SignOutButton } from "@/components/auth/sign-out-button";
 
 interface SidebarProps {
   storeId: string;
@@ -48,6 +50,18 @@ export function Sidebar({ storeId, storeName, role, userName }: SidebarProps) {
       roles: ["MASTER", "OWNER", "EMPLOYEE"],
     },
     {
+      href: `/stores/${storeId}/cash-sessions`,
+      label: "Fechamentos de Caixa",
+      icon: <Banknote size={20} />,
+      roles: ["MASTER", "OWNER", "EMPLOYEE"],
+    },
+    {
+      href: `/stores/${storeId}/sales`,
+      label: "Histórico de Vendas",
+      icon: <ListOrdered size={20} />,
+      roles: ["MASTER", "OWNER", "EMPLOYEE"],
+    },
+    {
       href: `/stores/${storeId}/products`,
       label: "Produtos",
       icon: <Package size={20} />,
@@ -66,6 +80,12 @@ export function Sidebar({ storeId, storeName, role, userName }: SidebarProps) {
       roles: ["MASTER", "OWNER"],
     },
     {
+      href: `/stores/${storeId}/employees`,
+      label: "Funcionários",
+      icon: <Users size={20} />,
+      roles: ["MASTER", "OWNER"],
+    },
+    {
       href: `/stores/${storeId}/receivables`,
       label: "Fiado",
       icon: <Receipt size={20} />,
@@ -75,13 +95,8 @@ export function Sidebar({ storeId, storeName, role, userName }: SidebarProps) {
 
   const filteredItems = navItems.filter((item) => item.roles.includes(role));
 
-  async function handleSignOut() {
-    await fetch("/api/auth/signout", { method: "POST" });
-    window.location.href = "/login";
-  }
-
   return (
-    <aside className="flex h-screen w-64 flex-col border-r border-gray-200 bg-white">
+    <aside className="hidden h-screen w-64 flex-col border-r border-gray-200 bg-white md:flex">
       {/* Store header */}
       <div className="border-b border-gray-200 px-4 py-4">
         <Link href="/stores" className="flex items-center gap-2 text-gray-600 hover:text-gray-900">
@@ -93,7 +108,7 @@ export function Sidebar({ storeId, storeName, role, userName }: SidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
+      <nav className="flex-1 overflow-y-auto px-3 py-2 md:py-4">
         <ul className="space-y-1">
           {filteredItems.map((item) => {
             const isActive = pathname === item.href;
@@ -121,13 +136,7 @@ export function Sidebar({ storeId, storeName, role, userName }: SidebarProps) {
       {/* User footer */}
       <div className="border-t border-gray-200 px-4 py-3">
         <p className="text-sm font-medium text-gray-900 truncate">{userName}</p>
-        <button
-          onClick={handleSignOut}
-          className="mt-2 flex items-center gap-2 text-sm text-gray-500 hover:text-red-600 transition-colors"
-        >
-          <LogOut size={16} />
-          Sair
-        </button>
+        <SignOutButton className="mt-2" />
       </div>
     </aside>
   );

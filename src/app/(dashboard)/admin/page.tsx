@@ -9,6 +9,7 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { formatCurrency } from "@/lib/utils";
 import { Store, DollarSign, TrendingUp, Receipt } from "lucide-react";
 import Link from "next/link";
+import { MasterStoresClient } from "@/components/admin/master-stores-client";
 
 export default async function AdminPage() {
   const user = await authService.getCurrentUser();
@@ -58,6 +59,8 @@ export default async function AdminPage() {
             trend={data.globalOutstanding > 0 ? "down" : "neutral"}
           />
         </div>
+
+        <MasterStoresClient />
       </div>
     </div>
   );

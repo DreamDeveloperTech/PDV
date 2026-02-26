@@ -110,6 +110,7 @@ export default function ProductsPage({ params }: { params: Promise<{ storeId: st
               <TableHead>Custo</TableHead>
               <TableHead>Estoque</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead className="text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -136,6 +137,13 @@ export default function ProductsPage({ params }: { params: Promise<{ storeId: st
                     <Badge variant={product.isActive ? "success" : "default"}>
                       {product.isActive ? "Ativo" : "Inativo"}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Link href={`/stores/${storeId}/products/${product.id}/edit`}>
+                      <Button variant="ghost" size="sm">
+                        Editar
+                      </Button>
+                    </Link>
                   </TableCell>
                 </TableRow>
               ))

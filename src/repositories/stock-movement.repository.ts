@@ -44,13 +44,23 @@ export const stockMovementRepository = {
 
   async findByStoreId(
     storeId: string,
-    options?: { page?: number; pageSize?: number }
+    options?: { page?: number; pageSize?: number; from?: Date; to?: Date }
   ): Promise<{ data: (StockMovement & { product: { name: string } })[]; total: number }> {
     const page = options?.page ?? 1;
     const pageSize = options?.pageSize ?? 20;
     const skip = (page - 1) * pageSize;
 
-    const where = { storeId };
+    const where: { storeId: string; createdAt?: { gte?: Date; lte?: Date } } = {
+      storeId,
+      ...(options?.from || options?.to
+        ? {
+            createdAt: {
+              ...(options.from ? { gte: options.from } : {}),
+              ...(options.to ? { lte: options.to } : {}),
+            },
+          }
+        : {}),
+    };
 
     const [data, total] = await Promise.all([
       prisma.stockMovement.findMany({

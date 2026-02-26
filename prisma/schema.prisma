@@ -29,7 +29,10 @@ model User {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  storeUsers StoreUser[]
+  storeUsers          StoreUser[]
+  cashWithdrawals      CashWithdrawal[]
+  cashSessionsOpened  CashSession[] @relation("OpenedBy")
+  cashSessionsClosed  CashSession[] @relation("ClosedBy")
 
   @@index([supabaseId])
   @@index([email])
@@ -224,11 +227,28 @@ model CashSession {
   closedAt      DateTime?
   notes         String?
 
-  store Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  sales Sale[]
+  store         Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  openedByUser  User              @relation("OpenedBy", fields: [openedBy], references: [id])
+  closedByUser  User?             @relation("ClosedBy", fields: [closedBy], references: [id])
+  sales         Sale[]
+  withdrawals   CashWithdrawal[]
 
   @@index([storeId])
   @@index([storeId, status])
+}
+
+model CashWithdrawal {
+  id            String   @id @default(cuid())
+  cashSessionId String
+  amount        Float
+  withdrawnBy   String
+  notes         String?
+  createdAt     DateTime @default(now())
+
+  cashSession CashSession @relation(fields: [cashSessionId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [withdrawnBy], references: [id])
+
+  @@index([cashSessionId])
 }
 
 enum PaymentMethod {

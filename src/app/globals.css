@@ -1,1 +1,17 @@
 @import "tailwindcss";
+
+/* Scrollbar visível na lista de itens do carrinho (PDV) */
+.pdv-cart-items-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.pdv-cart-items-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+.pdv-cart-items-scroll::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 4px;
+}
+.pdv-cart-items-scroll::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}

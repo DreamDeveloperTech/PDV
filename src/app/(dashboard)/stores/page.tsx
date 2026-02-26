@@ -8,6 +8,7 @@ import { storeService } from "@/services/store.service";
 import { isMasterEmail } from "@/lib/utils";
 import Link from "next/link";
 import { Store, Plus, Shield } from "lucide-react";
+import { SignOutButton } from "@/components/auth/sign-out-button";
 
 export default async function StoresPage() {
   const user = await authService.getCurrentUser();
@@ -30,10 +31,10 @@ export default async function StoresPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-4xl px-4 py-12">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Minhas Lojas</h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="mt-1 text-sm text-gray-500">
               Olá, {user.name || user.email}
               {isMaster && (
                 <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">
@@ -42,13 +43,16 @@ export default async function StoresPage() {
               )}
             </p>
           </div>
-          <Link
-            href="/stores/new"
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
-          >
-            <Plus size={16} />
-            Nova Loja
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/stores/new"
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+            >
+              <Plus size={16} />
+              Nova Loja
+            </Link>
+            <SignOutButton className="px-4 py-2" />
+          </div>
         </div>
 
         {/* Store Grid */}
@@ -66,27 +70,58 @@ export default async function StoresPage() {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {stores.map(({ store, role }) => (
-              <Link
-                key={store.id}
-                href={`/stores/${store.id}/dashboard`}
-                className="group rounded-xl border border-gray-200 bg-white p-6 shadow-sm hover:shadow-md hover:border-blue-300 transition-all"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600 group-hover:bg-blue-100">
-                    <Store size={20} />
+              store.isActive ? (
+                <Link
+                  key={store.id}
+                  href={`/stores/${store.id}/dashboard`}
+                  className="group rounded-xl border border-gray-200 bg-white p-6 shadow-sm hover:shadow-md hover:border-blue-300 transition-all"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600 group-hover:bg-blue-100">
+                      <Store size={20} />
+                    </div>
+                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                      {role}
+                    </span>
                   </div>
-                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
-                    {role}
-                  </span>
+                  <h3 className="mt-4 text-lg font-semibold text-gray-900 group-hover:text-blue-600">
+                    {store.name}
+                  </h3>
+                  <p className="text-sm text-gray-500 truncate">{store.slug}</p>
+                  {store.address && (
+                    <p className="mt-1 text-xs text-gray-400 truncate">{store.address}</p>
+                  )}
+                  <div className="mt-2 flex items-center gap-2 text-xs">
+                    <span className="inline-flex items-center rounded-full px-2 py-0.5 font-medium bg-green-100 text-green-800">
+                      Loja Ativa
+                    </span>
+                  </div>
+                </Link>
+              ) : (
+                <div
+                  key={store.id}
+                  className="group rounded-xl border border-gray-200 bg-gray-50 p-6 shadow-sm opacity-75"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 text-gray-400">
+                      <Store size={20} />
+                    </div>
+                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
+                      {role}
+                    </span>
+                  </div>
+                  <h3 className="mt-4 text-lg font-semibold text-gray-500">{store.name}</h3>
+                  <p className="text-sm text-gray-400 truncate">{store.slug}</p>
+                  {store.address && (
+                    <p className="mt-1 text-xs text-gray-400 truncate">{store.address}</p>
+                  )}
+                  <div className="mt-2 flex items-center gap-2 text-xs">
+                    <span className="inline-flex items-center rounded-full px-2 py-0.5 font-medium bg-red-100 text-red-800">
+                      Loja Desativada
+                    </span>
+                  </div>
                 </div>
-                <h3 className="mt-4 text-lg font-semibold text-gray-900 group-hover:text-blue-600">
-                  {store.name}
-                </h3>
-                <p className="text-sm text-gray-500 truncate">{store.slug}</p>
-                {store.address && (
-                  <p className="mt-1 text-xs text-gray-400 truncate">{store.address}</p>
-                )}
-              </Link>
+              )
             ))}
           </div>
         )}

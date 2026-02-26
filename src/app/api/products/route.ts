@@ -51,7 +51,8 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const input = createProductSchema.parse(body);
-    const product = await productService.createProduct(storeId, input);
+    const operatorName = context.user.name || context.user.email;
+    const product = await productService.createProduct(storeId, input, operatorName);
 
     return NextResponse.json({ data: product }, { status: 201 });
   } catch (error) {

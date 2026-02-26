@@ -25,6 +25,12 @@ export const storeRepository = {
     });
   },
 
+  async findAllWithInactive(): Promise<Store[]> {
+    return prisma.store.findMany({
+      orderBy: { name: "asc" },
+    });
+  },
+
   async findByUserId(userId: string): Promise<(StoreUser & { store: Store })[]> {
     return prisma.storeUser.findMany({
       where: { userId, isActive: true },
@@ -47,9 +53,28 @@ export const storeRepository = {
   async countAll(): Promise<number> {
     return prisma.store.count({ where: { isActive: true } });
   },
+
+  async setActive(id: string, isActive: boolean): Promise<Store> {
+    return prisma.store.update({
+      where: { id },
+      data: { isActive },
+    });
+  },
+
+  async delete(id: string): Promise<void> {
+    await prisma.store.delete({
+      where: { id },
+    });
+  },
 };
 
 export const storeUserRepository = {
+  async findById(id: string): Promise<StoreUser | null> {
+    return prisma.storeUser.findUnique({
+      where: { id },
+    });
+  },
+
   async findByUserAndStore(userId: string, storeId: string): Promise<StoreUser | null> {
     return prisma.storeUser.findUnique({
       where: { userId_storeId: { userId, storeId } },

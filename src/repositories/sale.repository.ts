@@ -132,4 +132,75 @@ export const saleRepository = {
   async countByStoreId(storeId: string): Promise<number> {
     return prisma.sale.count({ where: { storeId } });
   },
+
+  /** List sales with filters and pagination for history/reports */
+  async findByStoreId(
+    storeId: string,
+    options: {
+      from?: Date;
+      to?: Date;
+      customerId?: string;
+      paymentMethod?: PaymentMethod;
+      productId?: string;
+      minTotal?: number;
+      maxTotal?: number;
+      page?: number;
+      pageSize?: number;
+    } = {}
+  ): Promise<{
+    data: (Sale & {
+      items: SaleItem[];
+      payments: SalePayment[];
+      customer: { id: string; name: string } | null;
+    })[];
+    total: number;
+  }> {
+    const page = options.page ?? 1;
+    const pageSize = options.pageSize ?? 20;
+    const skip = (page - 1) * pageSize;
+
+    const where = {
+      storeId,
+      ...(options.from || options.to
+        ? {
+            createdAt: {
+              ...(options.from ? { gte: options.from } : {}),
+              ...(options.to ? { lte: options.to } : {}),
+            },
+          }
+        : {}),
+      ...(options.customerId ? { customerId: options.customerId } : {}),
+      ...(options.paymentMethod
+        ? { payments: { some: { method: options.paymentMethod } } }
+        : {}),
+      ...(options.productId
+        ? { items: { some: { productId: options.productId } } }
+        : {}),
+      ...(options.minTotal != null || options.maxTotal != null
+        ? {
+            total: {
+              ...(options.minTotal != null ? { gte: options.minTotal } : {}),
+              ...(options.maxTotal != null ? { lte: options.maxTotal } : {}),
+            },
+          }
+        : {}),
+    };
+
+    const [data, total] = await Promise.all([
+      prisma.sale.findMany({
+        where,
+        skip,
+        take: pageSize,
+        orderBy: { createdAt: "desc" },
+        include: {
+          items: true,
+          payments: true,
+          customer: { select: { id: true, name: true } },
+        },
+      }),
+      prisma.sale.count({ where }),
+    ]);
+
+    return { data, total };
+  },
 };

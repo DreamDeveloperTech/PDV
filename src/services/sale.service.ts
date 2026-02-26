@@ -8,9 +8,12 @@ import { cashSessionRepository } from "@/repositories/cash-session.repository";
 import { productRepository } from "@/repositories/product.repository";
 import { productService } from "./product.service";
 import { receivableService } from "./receivable.service";
+import { isSessionExpiredForSales } from "./cash-session.service";
 import { NotFoundError, BusinessRuleError, ValidationError } from "@/lib/errors";
 import type { CreateSaleInput } from "@/schemas/sale.schema";
 import type { PaymentMethod } from "@/generated/prisma/client";
+
+const PAYMENT_METHODS: PaymentMethod[] = ["CASH", "CREDIT", "DEBIT", "PIX", "FIADO"];
 
 export const saleService = {
   /**
@@ -23,14 +26,19 @@ export const saleService = {
    * 5. If FIADO payment, validate customer credit
    * 6. Execute in transaction: create sale, deduct stock, create receivable
    */
-  async createSale(storeId: string, input: CreateSaleInput) {
-    // 1. Validate cash session
+  async createSale(storeId: string, input: CreateSaleInput, sellerName?: string | null) {
+    // 1. Validate cash session (deve estar aberta e dentro do prazo de 24h)
     const session = await cashSessionRepository.findById(input.cashSessionId);
     if (!session || session.storeId !== storeId) {
       throw new NotFoundError("Sessão de caixa");
     }
     if (session.status !== "OPEN") {
       throw new BusinessRuleError("Sessão de caixa está fechada");
+    }
+    if (isSessionExpiredForSales(session.openedAt)) {
+      throw new BusinessRuleError(
+        "Este caixa está aberto há mais de 24h. Feche-o e abra um novo para registrar vendas."
+      );
     }
 
     // 2. Load and validate all products
@@ -104,8 +112,9 @@ export const saleService = {
       });
 
       // Deduct stock for each item
+      const reason = sellerName ? `Venda - vendedor: ${sellerName}` : "Venda";
       for (const item of itemsWithProduct) {
-        await productService.deductStockForSale(storeId, item.productId, item.quantity);
+        await productService.deductStockForSale(storeId, item.productId, item.quantity, reason);
       }
 
       // Create receivable if FIADO
@@ -137,5 +146,40 @@ export const saleService = {
 
   async getSalesByCashSession(cashSessionId: string) {
     return saleRepository.findByCashSessionId(cashSessionId);
+  },
+
+  /** List sales with filters for history/reports */
+  async getSalesHistory(
+    storeId: string,
+    filters: {
+      from?: string;
+      to?: string;
+      customerId?: string;
+      paymentMethod?: string;
+      productId?: string;
+      minTotal?: number;
+      maxTotal?: number;
+      page?: number;
+      pageSize?: number;
+    }
+  ) {
+    const fromDate = filters.from ? new Date(filters.from + "T00:00:00") : undefined;
+    const toDate = filters.to ? new Date(filters.to + "T23:59:59.999") : undefined;
+    const paymentMethod =
+      filters.paymentMethod && PAYMENT_METHODS.includes(filters.paymentMethod as PaymentMethod)
+        ? (filters.paymentMethod as PaymentMethod)
+        : undefined;
+
+    return saleRepository.findByStoreId(storeId, {
+      from: fromDate,
+      to: toDate,
+      customerId: filters.customerId,
+      paymentMethod,
+      productId: filters.productId,
+      minTotal: filters.minTotal,
+      maxTotal: filters.maxTotal,
+      page: filters.page,
+      pageSize: filters.pageSize,
+    });
   },
 };

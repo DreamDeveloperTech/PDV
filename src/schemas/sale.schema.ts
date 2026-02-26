@@ -31,8 +31,20 @@ export const closeCashSessionSchema = z.object({
   notes: z.string().optional(),
 });
 
+export const withdrawCashSessionSchema = z.object({
+  sessionId: z.string().min(1, "Sessão de caixa é obrigatória"),
+  amount: z.number().min(0.01, "Valor da sangria deve ser maior que zero"),
+  notes: z.string().optional(),
+  /**
+   * Usuário responsável pela retirada (opcional).
+   * Se não vier, o backend usa o usuário logado.
+   */
+  withdrawnUserId: z.string().optional(),
+});
+
 export type SaleItemInput = z.infer<typeof saleItemSchema>;
 export type SalePaymentInput = z.infer<typeof salePaymentSchema>;
 export type CreateSaleInput = z.infer<typeof createSaleSchema>;
 export type OpenCashSessionInput = z.infer<typeof openCashSessionSchema>;
 export type CloseCashSessionInput = z.infer<typeof closeCashSessionSchema>;
+export type WithdrawCashSessionInput = z.infer<typeof withdrawCashSessionSchema>;

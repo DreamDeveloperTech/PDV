@@ -13,11 +13,16 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const storeId = searchParams.get("storeId");
+    const fromParam = searchParams.get("from");
+    const toParam = searchParams.get("to");
+
+    const from = fromParam ? new Date(fromParam) : undefined;
+    const to = toParam ? new Date(toParam) : undefined;
     const user = await authService.getCurrentUser();
 
     // MASTER dashboard (no storeId needed)
     if (isMasterEmail(user.email) && !storeId) {
-      const data = await dashboardService.getMasterDashboard();
+      const data = await dashboardService.getMasterDashboard(from, to);
       return NextResponse.json({ data, role: "MASTER" });
     }
 
@@ -28,7 +33,7 @@ export async function GET(request: NextRequest) {
     const context = await authService.getStoreUserContext(storeId);
 
     if (context.role === "MASTER" || context.role === "OWNER") {
-      const data = await dashboardService.getOwnerDashboard(storeId);
+      const data = await dashboardService.getOwnerDashboard(storeId, from, to);
       return NextResponse.json({ data, role: context.role });
     }
 

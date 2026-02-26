@@ -23,8 +23,13 @@ export async function GET(request: NextRequest) {
 
     const page = Number(searchParams.get("page") ?? "1");
     const pageSize = Number(searchParams.get("pageSize") ?? "20");
+    const fromParam = searchParams.get("from");
+    const toParam = searchParams.get("to");
 
-    const result = await productService.getStockMovements(storeId, { page, pageSize });
+    const from = fromParam ? new Date(fromParam) : undefined;
+    const to = toParam ? new Date(toParam) : undefined;
+
+    const result = await productService.getStockMovements(storeId, { page, pageSize, from, to });
     return NextResponse.json({
       data: result.data,
       total: result.total,
@@ -51,7 +56,15 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const input = stockAdjustmentSchema.parse(body);
-    const product = await productService.adjustStock(storeId, input);
+    const operatorName = context.user.name || context.user.email;
+    const reason =
+      input.reason && input.reason.trim().length > 0
+        ? `${input.reason} - por: ${operatorName}`
+        : `Ajuste de estoque - por: ${operatorName}`;
+    const product = await productService.adjustStock(storeId, {
+      ...input,
+      reason,
+    });
 
     return NextResponse.json({ data: product });
   } catch (error) {

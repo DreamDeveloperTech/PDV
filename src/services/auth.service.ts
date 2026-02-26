@@ -5,7 +5,7 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { userRepository } from "@/repositories/user.repository";
 import { storeUserRepository, storeRepository } from "@/repositories/store.repository";
-import { UnauthorizedError } from "@/lib/errors";
+import { UnauthorizedError, BusinessRuleError } from "@/lib/errors";
 import { isMasterEmail } from "@/lib/utils";
 import type { AuthUser, StoreUserContext } from "@/types";
 import type { Role } from "@/generated/prisma/client";
@@ -55,12 +55,20 @@ export const authService = {
       if (!store) {
         throw new UnauthorizedError("Loja não encontrada");
       }
+      if (!store.isActive) {
+        throw new BusinessRuleError("Esta loja está desativada");
+      }
       return { user, storeId, role: "MASTER" as Role };
     }
 
     const storeUser = await storeUserRepository.findByUserAndStore(user.id, storeId);
     if (!storeUser || !storeUser.isActive) {
       throw new UnauthorizedError("Você não tem acesso a esta loja");
+    }
+
+    const store = await storeRepository.findById(storeId);
+    if (!store || !store.isActive) {
+      throw new BusinessRuleError("Esta loja está desativada");
     }
 
     return { user, storeId, role: storeUser.role };

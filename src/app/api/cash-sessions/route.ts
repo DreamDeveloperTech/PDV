@@ -21,11 +21,18 @@ export async function GET(request: NextRequest) {
       throw new ValidationError("storeId é obrigatório");
     }
 
-    await authService.getStoreUserContext(storeId);
+    const context = await authService.getStoreUserContext(storeId);
 
     if (action === "current") {
       const session = await cashSessionService.getOpenSession(storeId);
-      return NextResponse.json({ data: session });
+      const data = session
+        ? {
+            ...session,
+            currentUserName: context.user.name || context.user.email,
+            currentUserId: context.user.id,
+          }
+        : null;
+      return NextResponse.json({ data });
     }
 
     const page = Number(searchParams.get("page") ?? "1");
@@ -58,14 +65,16 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const input = openCashSessionSchema.parse(body);
-    const session = await cashSessionService.openSession(
+    const result = await cashSessionService.openSession(
       storeId,
       context.user.id,
       input.openingAmount,
       input.notes
     );
 
-    return NextResponse.json({ data: session }, { status: 201 });
+    return NextResponse.json({
+      data: { ...result.session, alreadyOpen: result.alreadyOpen },
+    }, { status: result.alreadyOpen ? 200 : 201 });
   } catch (error) {
     return handleApiError(error);
   }

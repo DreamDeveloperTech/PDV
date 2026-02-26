@@ -20,7 +20,7 @@ export const productService = {
     return product;
   },
 
-  async createProduct(storeId: string, input: CreateProductInput) {
+  async createProduct(storeId: string, input: CreateProductInput, operatorName?: string) {
     const product = await productRepository.create(storeId, input);
 
     // Record initial stock if any
@@ -32,7 +32,7 @@ export const productService = {
         quantity: input.stock,
         previousStock: 0,
         newStock: input.stock,
-        reason: "Estoque inicial",
+        reason: operatorName ? `Estoque inicial - por: ${operatorName}` : "Estoque inicial",
       });
     }
 
@@ -87,7 +87,7 @@ export const productService = {
    * Deduct stock for a sale.
    * Called internally by the sale service during sale creation.
    */
-  async deductStockForSale(storeId: string, productId: string, quantity: number) {
+  async deductStockForSale(storeId: string, productId: string, quantity: number, reason?: string) {
     const product = await productRepository.findById(productId);
     if (!product) {
       throw new NotFoundError("Produto");
@@ -109,6 +109,7 @@ export const productService = {
       quantity: -quantity,
       previousStock,
       newStock,
+      reason,
     });
 
     return { ...product, stock: newStock };
@@ -118,7 +119,10 @@ export const productService = {
     return productRepository.findLowStock(storeId);
   },
 
-  async getStockMovements(storeId: string, options?: { page?: number; pageSize?: number }) {
+  async getStockMovements(
+    storeId: string,
+    options?: { page?: number; pageSize?: number; from?: Date; to?: Date }
+  ) {
     return stockMovementRepository.findByStoreId(storeId, options);
   },
 

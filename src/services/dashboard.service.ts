@@ -16,7 +16,7 @@ export interface MasterDashboardData {
 
 export interface OwnerDashboardData {
   storeRevenue: number;
-  monthlyRevenue: number;
+  monthlyRevenue: number; // usado como receita no período filtrado
   totalProducts: number;
   lowStockProducts: { id: string; name: string; stock: number; minStock: number }[];
   totalOutstanding: number;
@@ -31,24 +31,30 @@ export interface EmployeeDashboardData {
 }
 
 export const dashboardService = {
-  async getMasterDashboard(): Promise<MasterDashboardData> {
+  async getMasterDashboard(from?: Date, to?: Date): Promise<MasterDashboardData> {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const effectiveFrom = from ?? startOfMonth;
+    const effectiveTo = to;
 
     const [totalStores, globalRevenue, globalOutstanding, monthlyRevenue] =
       await Promise.all([
         storeRepository.countAll(),
         saleRepository.sumRevenueGlobal(),
         receivableRepository.sumOutstandingGlobal(),
-        saleRepository.sumRevenueGlobal(startOfMonth),
+        saleRepository.sumRevenueGlobal(effectiveFrom, effectiveTo),
       ]);
 
     return { totalStores, globalRevenue, globalOutstanding, monthlyRevenue };
   },
 
-  async getOwnerDashboard(storeId: string): Promise<OwnerDashboardData> {
+  async getOwnerDashboard(storeId: string, from?: Date, to?: Date): Promise<OwnerDashboardData> {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const effectiveFrom = from ?? startOfMonth;
+    const effectiveTo = to;
 
     const [
       storeRevenue,
@@ -60,7 +66,7 @@ export const dashboardService = {
       totalSales,
     ] = await Promise.all([
       saleRepository.sumRevenueByStore(storeId),
-      saleRepository.sumRevenueByStore(storeId, startOfMonth),
+      saleRepository.sumRevenueByStore(storeId, effectiveFrom, effectiveTo),
       productRepository.countByStoreId(storeId),
       productRepository.findLowStock(storeId),
       receivableRepository.sumOutstandingByStore(storeId),

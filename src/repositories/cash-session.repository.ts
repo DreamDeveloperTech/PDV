@@ -11,10 +11,18 @@ export const cashSessionRepository = {
     });
   },
 
-  /** Find currently open session for a store */
+  /** Find currently open session for a store (legacy - use findMostRecentOpenByStoreId) */
   async findOpenByStoreId(storeId: string): Promise<CashSession | null> {
     return prisma.cashSession.findFirst({
       where: { storeId, status: "OPEN" },
+    });
+  },
+
+  /** Find the most recently opened session that is still OPEN (permite múltiplos caixas; PDV usa o mais recente) */
+  async findMostRecentOpenByStoreId(storeId: string): Promise<CashSession | null> {
+    return prisma.cashSession.findFirst({
+      where: { storeId, status: "OPEN" },
+      orderBy: { openedAt: "desc" },
     });
   },
 
@@ -34,6 +42,10 @@ export const cashSessionRepository = {
         skip,
         take: pageSize,
         orderBy: { openedAt: "desc" },
+        include: {
+          openedByUser: { select: { id: true, name: true, email: true } },
+          closedByUser: { select: { id: true, name: true, email: true } },
+        },
       }),
       prisma.cashSession.count({ where }),
     ]);
