@@ -73,7 +73,7 @@ export function BottomNav({ storeId, role }: BottomNavProps) {
       href: `/stores/${storeId}/receivables`,
       label: "Fiado",
       icon: <Receipt size={18} />,
-      roles: ["MASTER", "OWNER", "EMPLOYEE"],
+      roles: ["MASTER", "OWNER"],
     },
   ];
 

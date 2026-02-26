@@ -20,7 +20,8 @@ export async function GET(request: NextRequest) {
       throw new ValidationError("storeId é obrigatório");
     }
 
-    await authService.getStoreUserContext(storeId);
+    const context = await authService.getStoreUserContext(storeId);
+    authService.requireRole(context, ["MASTER", "OWNER"]);
 
     const status = searchParams.get("status") as ReceivableStatus | null;
     const page = Number(searchParams.get("page") ?? "1");
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest) {
     }
 
     const context = await authService.getStoreUserContext(storeId);
-    authService.requireRole(context, ["MASTER", "OWNER", "EMPLOYEE"]);
+    authService.requireRole(context, ["MASTER", "OWNER"]);
 
     const body = await request.json();
     const input = receivablePaymentSchema.parse(body);
