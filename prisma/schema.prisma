@@ -1,0 +1,289 @@
+// =============================================================================
+// PDV SaaS Multi-Tenant - Prisma Schema
+// Decisions:
+// - All tenant-scoped tables include storeId for multi-tenant isolation
+// - Composite indexes on (storeId, ...) for fast tenant-scoped queries
+// - Float used for monetary values (migrate to Decimal for high-precision needs)
+// - Denormalized productName in SaleItem for receipt/history purposes
+// =============================================================================
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// =============================================================================
+// AUTH & MULTI-TENANT
+// =============================================================================
+
+model User {
+  id         String   @id @default(cuid())
+  email      String   @unique
+  name       String?
+  avatarUrl  String?
+  supabaseId String   @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  storeUsers StoreUser[]
+
+  @@index([supabaseId])
+  @@index([email])
+}
+
+enum Role {
+  MASTER
+  OWNER
+  EMPLOYEE
+}
+
+model Store {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  document  String?
+  phone     String?
+  address   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  storeUsers         StoreUser[]
+  products           Product[]
+  customers          Customer[]
+  cashSessions       CashSession[]
+  sales              Sale[]
+  stockMovements     StockMovement[]
+  accountsReceivable AccountReceivable[]
+
+  @@index([slug])
+}
+
+model StoreUser {
+  id        String   @id @default(cuid())
+  userId    String
+  storeId   String
+  role      Role     @default(EMPLOYEE)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, storeId])
+  @@index([storeId])
+  @@index([userId])
+}
+
+// =============================================================================
+// PRODUCTS & STOCK
+// =============================================================================
+
+model Product {
+  id          String   @id @default(cuid())
+  storeId     String
+  name        String
+  description String?
+  barcode     String?
+  sku         String?
+  cost        Float    @default(0)
+  price       Float
+  stock       Float    @default(0)
+  minStock    Float    @default(0)
+  unit        String   @default("un")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  store     Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  movements StockMovement[]
+  saleItems SaleItem[]
+
+  @@index([storeId])
+  @@index([storeId, barcode])
+  @@index([storeId, name])
+}
+
+enum MovementType {
+  SALE
+  RESTOCK
+  ADJUSTMENT
+}
+
+model StockMovement {
+  id            String       @id @default(cuid())
+  storeId       String
+  productId     String
+  type          MovementType
+  quantity      Float
+  previousStock Float
+  newStock      Float
+  reason        String?
+  createdAt     DateTime     @default(now())
+
+  store   Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@index([productId])
+  @@index([storeId, productId])
+  @@index([createdAt])
+}
+
+// =============================================================================
+// CUSTOMERS & FIADO (ACCOUNTS RECEIVABLE)
+// =============================================================================
+
+model Customer {
+  id               String   @id @default(cuid())
+  storeId          String
+  name             String
+  document         String?
+  phone            String?
+  email            String?
+  creditLimit      Float    @default(0)
+  blockedForCredit Boolean  @default(false)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  store       Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  receivables AccountReceivable[]
+  sales       Sale[]
+
+  @@index([storeId])
+  @@index([storeId, name])
+}
+
+enum ReceivableStatus {
+  OPEN
+  PARTIAL
+  PAID
+}
+
+model AccountReceivable {
+  id          String           @id @default(cuid())
+  storeId     String
+  customerId  String
+  saleId      String?          @unique
+  amount      Float
+  paidAmount  Float            @default(0)
+  status      ReceivableStatus @default(OPEN)
+  dueDate     DateTime?
+  description String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  store    Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customer Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  sale     Sale?               @relation(fields: [saleId], references: [id])
+  payments ReceivablePayment[]
+
+  @@index([storeId])
+  @@index([customerId])
+  @@index([storeId, status])
+  @@index([storeId, customerId])
+}
+
+model ReceivablePayment {
+  id            String   @id @default(cuid())
+  receivableId  String
+  amount        Float
+  paymentMethod String   @default("CASH")
+  notes         String?
+  createdAt     DateTime @default(now())
+
+  receivable AccountReceivable @relation(fields: [receivableId], references: [id], onDelete: Cascade)
+
+  @@index([receivableId])
+}
+
+// =============================================================================
+// PDV - CASH SESSIONS & SALES
+// =============================================================================
+
+enum CashSessionStatus {
+  OPEN
+  CLOSED
+}
+
+model CashSession {
+  id            String            @id @default(cuid())
+  storeId       String
+  openedBy      String
+  closedBy      String?
+  openingAmount Float             @default(0)
+  closingAmount Float?
+  status        CashSessionStatus @default(OPEN)
+  openedAt      DateTime          @default(now())
+  closedAt      DateTime?
+  notes         String?
+
+  store Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  sales Sale[]
+
+  @@index([storeId])
+  @@index([storeId, status])
+}
+
+enum PaymentMethod {
+  CASH
+  CREDIT
+  DEBIT
+  PIX
+  FIADO
+}
+
+model Sale {
+  id            String   @id @default(cuid())
+  storeId       String
+  cashSessionId String
+  customerId    String?
+  subtotal      Float
+  discount      Float    @default(0)
+  total         Float
+  createdAt     DateTime @default(now())
+
+  store       Store              @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  cashSession CashSession        @relation(fields: [cashSessionId], references: [id])
+  customer    Customer?          @relation(fields: [customerId], references: [id])
+  items       SaleItem[]
+  payments    SalePayment[]
+  receivable  AccountReceivable?
+
+  @@index([storeId])
+  @@index([cashSessionId])
+  @@index([storeId, createdAt])
+}
+
+model SaleItem {
+  id          String @id @default(cuid())
+  saleId      String
+  productId   String
+  productName String
+  quantity    Float
+  unitPrice   Float
+  total       Float
+
+  sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([saleId])
+}
+
+model SalePayment {
+  id        String        @id @default(cuid())
+  saleId    String
+  method    PaymentMethod
+  amount    Float
+  createdAt DateTime      @default(now())
+
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([saleId])
+}
