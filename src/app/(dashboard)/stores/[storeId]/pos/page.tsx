@@ -494,21 +494,36 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
           className="mb-3"
         />
 
-        {/* Product grid */}
-        <div className="max-h-[340px] overflow-y-auto rounded-lg bg-white p-2 md:max-h-none md:flex-1 md:min-h-0 md:p-0 md:bg-transparent">
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4">
-            {filteredProducts.map((product) => (
-              <button
-                key={product.id}
-                onClick={() => addToCart(product)}
-                disabled={product.stock <= 0 || session.isExpiredForSales}
-                className="rounded-lg border border-gray-200 bg-white p-3 text-left hover:border-blue-300 hover:shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
-                <p className="text-lg font-bold text-blue-600">{formatCurrency(product.price)}</p>
-                <p className="text-xs text-gray-400">Estoque: {product.stock}</p>
-              </button>
-            ))}
+        {/* Product list - one row per product */}
+        <div className="max-h-[340px] overflow-y-auto rounded-lg border border-gray-200 bg-white md:max-h-none md:flex-1 md:min-h-0 md:border-0 md:bg-transparent">
+          <div className="divide-y divide-gray-100">
+            {filteredProducts.length === 0 ? (
+              <p className="py-6 text-center text-sm text-gray-500">Nenhum produto encontrado</p>
+            ) : (
+              filteredProducts.map((product) => (
+                <div
+                  key={product.id}
+                  className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
+                    <p className="text-xs text-gray-500">Estoque: {product.stock}</p>
+                  </div>
+                  <span className="shrink-0 text-sm font-semibold text-blue-600">
+                    {formatCurrency(product.price)}
+                  </span>
+                  <Button
+                    size="sm"
+                    onClick={() => addToCart(product)}
+                    disabled={product.stock <= 0 || session.isExpiredForSales}
+                    className="shrink-0"
+                  >
+                    <Plus size={16} className="mr-1" />
+                    Adicionar
+                  </Button>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>
