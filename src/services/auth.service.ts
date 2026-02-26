@@ -83,4 +83,20 @@ export const authService = {
       throw new UnauthorizedError("Permissão insuficiente para esta ação");
     }
   },
+
+  /**
+   * Verify current user's password (e.g. before sensitive actions like cancelling a sale).
+   * Re-authenticates with Supabase; throws if password is wrong.
+   */
+  async verifyPassword(password: string): Promise<void> {
+    const user = await this.getCurrentUser();
+    const supabase = await createSupabaseServerClient();
+    const { error } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password,
+    });
+    if (error) {
+      throw new UnauthorizedError("Senha incorreta ou não cadastrada. Defina uma senha nas opções abaixo.");
+    }
+  },
 };

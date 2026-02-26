@@ -75,6 +75,12 @@ export const receivableRepository = {
     return prisma.accountReceivable.create({ data });
   },
 
+  async findBySaleId(saleId: string): Promise<AccountReceivable | null> {
+    return prisma.accountReceivable.findUnique({
+      where: { saleId },
+    });
+  },
+
   async updatePayment(
     id: string,
     paidAmount: number,
@@ -83,6 +89,13 @@ export const receivableRepository = {
     return prisma.accountReceivable.update({
       where: { id },
       data: { paidAmount, status },
+    });
+  },
+
+  async setStatus(id: string, status: ReceivableStatus): Promise<AccountReceivable> {
+    return prisma.accountReceivable.update({
+      where: { id },
+      data: { status },
     });
   },
 

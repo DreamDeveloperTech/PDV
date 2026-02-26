@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
       throw new ValidationError("storeId é obrigatório");
     }
 
-    await authService.getStoreUserContext(storeId);
+    const context = await authService.getStoreUserContext(storeId);
 
     const from = searchParams.get("from") ?? undefined;
     const to = searchParams.get("to") ?? undefined;
@@ -42,12 +42,14 @@ export async function GET(request: NextRequest) {
       pageSize,
     });
 
+    const canCancelSale = ["MASTER", "OWNER"].includes(context.role);
     return NextResponse.json({
       data: result.data,
       total: result.total,
       page,
       pageSize,
       totalPages: Math.ceil(result.total / pageSize),
+      canCancelSale,
     });
   } catch (error) {
     return handleApiError(error);

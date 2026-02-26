@@ -23,12 +23,14 @@ import {
   QrCode,
   Banknote,
   Receipt,
+  Tag,
 } from "lucide-react";
 
 interface Product {
   id: string;
   name: string;
   price: number;
+  cost?: number;
   stock: number;
   /** Estoque efetivo (derivados/receitas); quando presente, usar no PDV no lugar de stock */
   effectiveStock?: number;
@@ -108,6 +110,7 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
   const [currentPaymentAmount, setCurrentPaymentAmount] = useState("");
   const [changeAmount, setChangeAmount] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
+  const [sellAtCost, setSellAtCost] = useState(false);
 
   // Modal states
   const [openSessionModal, setOpenSessionModal] = useState(false);
@@ -217,6 +220,10 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
     return product.effectiveStock ?? product.stock;
   }
 
+  function getUnitPrice(product: Product): number {
+    return sellAtCost ? (product.cost ?? 0) : product.price;
+  }
+
   function addToCart(product: Product) {
     const existingInCart = cart.find((item) => item.productId === product.id);
     const currentQty = existingInCart?.quantity ?? 0;
@@ -227,13 +234,14 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
       return;
     }
 
+    const unitPrice = getUnitPrice(product);
     setCart((prev) => {
       const existing = prev.find((item) => item.productId === product.id);
       if (existing) {
         const newQty = existing.quantity + 1;
         return prev.map((item) =>
           item.productId === product.id
-            ? { ...item, quantity: newQty, total: newQty * item.price }
+            ? { ...item, quantity: newQty, price: unitPrice, total: newQty * unitPrice }
             : item
         );
       }
@@ -242,9 +250,9 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
         {
           productId: product.id,
           name: product.name,
-          price: product.price,
+          price: unitPrice,
           quantity: 1,
-          total: product.price,
+          total: unitPrice,
         },
       ];
     });
@@ -501,13 +509,26 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
           </div>
         )}
 
-        {/* Search */}
-        <Input
-          placeholder="Buscar produto por nome ou código de barras..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="mb-3"
-        />
+        {/* Search + Preço de custo */}
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+          <Input
+            placeholder="Buscar produto por nome ou código de barras..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="flex-1 min-w-0"
+          />
+          <Button
+            type="button"
+            variant={sellAtCost ? "primary" : "secondary"}
+            size="sm"
+            onClick={() => setSellAtCost((v) => !v)}
+            className="shrink-0"
+            title={sellAtCost ? "Desativar venda a preço de custo" : "Vender a preço de custo"}
+          >
+            <Tag size={16} className="mr-1" />
+            {sellAtCost ? "Preço de custo (ON)" : "Preço de custo"}
+          </Button>
+        </div>
 
         {/* Product list - one row per product */}
         <div className="max-h-[340px] overflow-y-auto rounded-lg border border-gray-200 bg-white md:max-h-none md:flex-1 md:min-h-0 md:border-0 md:bg-transparent">
@@ -525,7 +546,10 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
                     <p className="text-xs text-gray-500">Estoque: {getAvailableStock(product)}</p>
                   </div>
                   <span className="shrink-0 text-sm font-semibold text-blue-600">
-                    {formatCurrency(product.price)}
+                    {formatCurrency(getUnitPrice(product))}
+                    {sellAtCost && (
+                      <span className="ml-1 text-xs font-normal text-amber-600">(custo)</span>
+                    )}
                   </span>
                   <Button
                     size="sm"

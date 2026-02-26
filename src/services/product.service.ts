@@ -188,6 +188,54 @@ export const productService = {
     await this._deductSingle(storeId, productId, quantity, reason);
   },
 
+  /**
+   * Add stock for a single product (internal use, e.g. sale cancellation).
+   */
+  async _addSingle(storeId: string, productId: string, quantity: number, reason?: string) {
+    const product = await productRepository.findById(productId);
+    if (!product) throw new NotFoundError("Produto");
+    if (product.storeId !== storeId) throw new ValidationError("Produto não pertence a esta loja");
+
+    const previousStock = product.stock;
+    const newStock = previousStock + quantity;
+
+    await productRepository.updateStock(product.id, newStock);
+    await stockMovementRepository.create({
+      storeId,
+      productId: product.id,
+      type: "CANCELLATION",
+      quantity,
+      previousStock,
+      newStock,
+      reason,
+    });
+    return { ...product, stock: newStock };
+  },
+
+  /**
+   * Add back stock for a cancelled sale. Mirror of deductStockForSale.
+   */
+  async addStockForCancellation(storeId: string, productId: string, quantity: number, reason?: string) {
+    const product = await productRepository.findByIdWithBaseAndIngredients(productId);
+    if (!product) throw new NotFoundError("Produto");
+
+    if (product.baseProductId != null && product.conversionFactor != null && product.baseProduct) {
+      const addQty = quantity * product.conversionFactor;
+      await this._addSingle(storeId, product.baseProductId, addQty, reason);
+      return;
+    }
+
+    if (product.ingredients && product.ingredients.length > 0) {
+      for (const ing of product.ingredients) {
+        const addQty = quantity * ing.quantityPerUnit;
+        await this._addSingle(storeId, ing.ingredientProductId, addQty, reason);
+      }
+      return;
+    }
+
+    await this._addSingle(storeId, productId, quantity, reason);
+  },
+
   async getLowStockProducts(storeId: string) {
     return productRepository.findLowStock(storeId);
   },

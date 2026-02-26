@@ -6,9 +6,10 @@ import { receivableRepository, receivablePaymentRepository } from "@/repositorie
 import { customerRepository } from "@/repositories/customer.repository";
 import { NotFoundError, BusinessRuleError, ValidationError } from "@/lib/errors";
 import type { ReceivablePaymentInput } from "@/schemas/receivable.schema";
+import type { ReceivableStatus } from "@/generated/prisma/client";
 
 export const receivableService = {
-  async getReceivables(storeId: string, options?: { status?: "OPEN" | "PARTIAL" | "PAID"; page?: number; pageSize?: number }) {
+  async getReceivables(storeId: string, options?: { status?: ReceivableStatus; page?: number; pageSize?: number }) {
     return receivableRepository.findByStoreId(storeId, options);
   },
 
@@ -132,6 +133,17 @@ export const receivableService = {
 
     if (shouldBlock !== customer.blockedForCredit) {
       await customerRepository.updateCreditBlock(customerId, shouldBlock);
+    }
+  },
+
+  /**
+   * Cancel a receivable linked to a sale (e.g. when sale is cancelled).
+   */
+  async cancelBySaleId(saleId: string): Promise<void> {
+    const receivable = await receivableRepository.findBySaleId(saleId);
+    if (receivable) {
+      await receivableRepository.setStatus(receivable.id, "CANCELLED");
+      await this.checkAndUpdateCreditBlock(receivable.customerId);
     }
   },
 

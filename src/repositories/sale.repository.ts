@@ -45,13 +45,26 @@ export const saleRepository = {
     });
   },
 
+  /** Sales for a cash session. Excludes cancelled by default so expectedCash is correct. */
   async findByCashSessionId(
-    cashSessionId: string
+    cashSessionId: string,
+    options?: { includeCancelled?: boolean }
   ): Promise<(Sale & { items: SaleItem[]; payments: SalePayment[] })[]> {
+    const where = {
+      cashSessionId,
+      ...(options?.includeCancelled ? {} : { cancelledAt: null }),
+    };
     return prisma.sale.findMany({
-      where: { cashSessionId },
+      where,
       include: { items: true, payments: true },
       orderBy: { createdAt: "desc" },
+    });
+  },
+
+  async updateCancelled(saleId: string, cancelledBy: string): Promise<Sale> {
+    return prisma.sale.update({
+      where: { id: saleId },
+      data: { cancelledAt: new Date(), cancelledBy },
     });
   },
 
@@ -82,7 +95,7 @@ export const saleRepository = {
     });
   },
 
-  /** Sum revenue for a store in a given date range */
+  /** Sum revenue for a store in a given date range (excludes cancelled sales). */
   async sumRevenueByStore(
     storeId: string,
     startDate?: Date,
@@ -90,6 +103,7 @@ export const saleRepository = {
   ): Promise<number> {
     const where = {
       storeId,
+      cancelledAt: null,
       ...(startDate || endDate
         ? {
             createdAt: {
@@ -108,9 +122,10 @@ export const saleRepository = {
     return result._sum.total ?? 0;
   },
 
-  /** Sum global revenue across all stores */
+  /** Sum global revenue across all stores (excludes cancelled sales). */
   async sumRevenueGlobal(startDate?: Date, endDate?: Date): Promise<number> {
     const where = {
+      cancelledAt: null,
       ...(startDate || endDate
         ? {
             createdAt: {

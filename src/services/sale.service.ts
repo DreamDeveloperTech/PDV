@@ -150,6 +150,49 @@ export const saleService = {
     return saleRepository.findByCashSessionId(cashSessionId);
   },
 
+  /**
+   * Cancel a sale: revert stock, exclude from cash (expectedCash), cancel receivable if FIADO.
+   * Only MASTER/OWNER may cancel; password is verified by the API before calling this.
+   */
+  async cancelSale(storeId: string, saleId: string, cancelledByUserId: string) {
+    const sale = await saleRepository.findById(saleId);
+    if (!sale) {
+      throw new NotFoundError("Venda");
+    }
+    if (sale.storeId !== storeId) {
+      throw new ValidationError("Venda não pertence a esta loja");
+    }
+    if (sale.cancelledAt != null) {
+      throw new BusinessRuleError("Esta venda já está cancelada");
+    }
+
+    const session = await cashSessionRepository.findById(sale.cashSessionId);
+    if (!session || session.storeId !== storeId) {
+      throw new NotFoundError("Sessão de caixa");
+    }
+    if (session.status !== "OPEN") {
+      throw new BusinessRuleError("Não é possível cancelar venda de um caixa já fechado");
+    }
+
+    await prisma.$transaction(async () => {
+      await saleRepository.updateCancelled(saleId, cancelledByUserId);
+
+      const reason = "Cancelamento de venda";
+      for (const item of sale.items) {
+        await productService.addStockForCancellation(
+          storeId,
+          item.productId,
+          item.quantity,
+          reason
+        );
+      }
+
+      await receivableService.cancelBySaleId(saleId);
+    });
+
+    return saleRepository.findById(saleId);
+  },
+
   /** List sales with filters for history/reports */
   async getSalesHistory(
     storeId: string,

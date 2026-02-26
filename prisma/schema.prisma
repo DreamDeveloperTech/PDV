@@ -137,6 +137,7 @@ enum MovementType {
   SALE
   RESTOCK
   ADJUSTMENT
+  CANCELLATION
 }
 
 model StockMovement {
@@ -188,6 +189,7 @@ enum ReceivableStatus {
   OPEN
   PARTIAL
   PAID
+  CANCELLED
 }
 
 model AccountReceivable {
@@ -281,14 +283,16 @@ enum PaymentMethod {
 }
 
 model Sale {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   storeId       String
   cashSessionId String
   customerId    String?
   subtotal      Float
-  discount      Float    @default(0)
+  discount      Float     @default(0)
   total         Float
-  createdAt     DateTime @default(now())
+  createdAt     DateTime  @default(now())
+  cancelledAt   DateTime?
+  cancelledBy   String?
 
   store       Store              @relation(fields: [storeId], references: [id], onDelete: Cascade)
   cashSession CashSession        @relation(fields: [cashSessionId], references: [id])

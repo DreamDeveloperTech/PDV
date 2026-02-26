@@ -42,9 +42,14 @@ export const withdrawCashSessionSchema = z.object({
   withdrawnUserId: z.string().optional(),
 });
 
+export const cancelSaleSchema = z.object({
+  password: z.string().min(1, "Senha é obrigatória para cancelar"),
+});
+
 export type SaleItemInput = z.infer<typeof saleItemSchema>;
 export type SalePaymentInput = z.infer<typeof salePaymentSchema>;
 export type CreateSaleInput = z.infer<typeof createSaleSchema>;
 export type OpenCashSessionInput = z.infer<typeof openCashSessionSchema>;
 export type CloseCashSessionInput = z.infer<typeof closeCashSessionSchema>;
 export type WithdrawCashSessionInput = z.infer<typeof withdrawCashSessionSchema>;
+export type CancelSaleInput = z.infer<typeof cancelSaleSchema>;

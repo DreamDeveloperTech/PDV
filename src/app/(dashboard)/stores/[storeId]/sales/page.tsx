@@ -17,8 +17,12 @@ import {
   TableCell,
   EmptyState,
 } from "@/components/ui/table";
+import { Modal } from "@/components/ui/modal";
+import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
-import { Search } from "lucide-react";
+import { apiRequest } from "@/hooks/use-fetch";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { Search, XCircle } from "lucide-react";
 
 interface SaleItem {
   productName: string;
@@ -37,6 +41,7 @@ interface SaleRow {
   total: number;
   discount: number;
   createdAt: string;
+  cancelledAt: string | null;
   customer: { id: string; name: string } | null;
   items: SaleItem[];
   payments: SalePayment[];
@@ -73,6 +78,19 @@ export default function SalesPage({ params }: { params: Promise<{ storeId: strin
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [canCancelSale, setCanCancelSale] = useState(false);
+
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [saleToCancel, setSaleToCancel] = useState<SaleRow | null>(null);
+  const [cancelPassword, setCancelPassword] = useState("");
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [cancelError, setCancelError] = useState("");
+
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [setPasswordLoading, setSetPasswordLoading] = useState(false);
+  const [setPasswordError, setSetPasswordError] = useState("");
+  const [setPasswordSuccess, setSetPasswordSuccess] = useState(false);
 
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -123,6 +141,7 @@ export default function SalesPage({ params }: { params: Promise<{ storeId: strin
       setSales(json.data ?? []);
       setTotalPages(json.totalPages ?? 1);
       setTotal(json.total ?? 0);
+      setCanCancelSale(Boolean(json.canCancelSale));
     } catch {
       setSales([]);
     } finally {
@@ -170,6 +189,69 @@ export default function SalesPage({ params }: { params: Promise<{ storeId: strin
     if (items.length === 0) return "—";
     if (items.length === 1) return `${items[0].productName} (${items[0].quantity}x)`;
     return `${items.length} itens`;
+  }
+
+  function openCancelModal(sale: SaleRow) {
+    setSaleToCancel(sale);
+    setCancelPassword("");
+    setCancelError("");
+    setCancelModalOpen(true);
+  }
+
+  function closeCancelModal() {
+    setCancelModalOpen(false);
+    setSaleToCancel(null);
+    setCancelPassword("");
+    setCancelError("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setSetPasswordError("");
+    setSetPasswordSuccess(false);
+  }
+
+  async function handleConfirmCancel() {
+    if (!saleToCancel || !cancelPassword.trim()) return;
+    setCancelLoading(true);
+    setCancelError("");
+    try {
+      await apiRequest(
+        `/api/sales/${saleToCancel.id}/cancel?storeId=${storeId}`,
+        { method: "POST", body: { password: cancelPassword } }
+      );
+      closeCancelModal();
+      fetchSales();
+    } catch (err) {
+      setCancelError(err instanceof Error ? err.message : "Erro ao cancelar venda");
+    } finally {
+      setCancelLoading(false);
+    }
+  }
+
+  async function handleSetPassword() {
+    if (newPassword.length < 6) {
+      setSetPasswordError("A senha deve ter no mínimo 6 caracteres");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setSetPasswordError("As senhas não coincidem");
+      return;
+    }
+    setSetPasswordLoading(true);
+    setSetPasswordError("");
+    setSetPasswordSuccess(false);
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      setSetPasswordSuccess(true);
+      setNewPassword("");
+      setConfirmPassword("");
+      setCancelError("");
+    } catch (err) {
+      setSetPasswordError(err instanceof Error ? err.message : "Erro ao cadastrar senha");
+    } finally {
+      setSetPasswordLoading(false);
+    }
   }
 
   return (
@@ -272,6 +354,8 @@ export default function SalesPage({ params }: { params: Promise<{ storeId: strin
                 <TableHead>Itens</TableHead>
                 <TableHead>Pagamento</TableHead>
                 <TableHead className="text-right">Total</TableHead>
+                <TableHead>Status</TableHead>
+                {canCancelSale && <TableHead className="w-[100px]">Ações</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -304,6 +388,28 @@ export default function SalesPage({ params }: { params: Promise<{ storeId: strin
                     <TableCell className="text-right font-medium">
                       {formatCurrency(sale.total)}
                     </TableCell>
+                    <TableCell>
+                      {sale.cancelledAt ? (
+                        <Badge variant="default">Cancelada</Badge>
+                      ) : (
+                        <Badge variant="success">Concluída</Badge>
+                      )}
+                    </TableCell>
+                    {canCancelSale && (
+                      <TableCell>
+                        {!sale.cancelledAt && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => openCancelModal(sale)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <XCircle size={14} className="mr-1" />
+                            Cancelar
+                          </Button>
+                        )}
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))
               )}
@@ -343,6 +449,90 @@ export default function SalesPage({ params }: { params: Promise<{ storeId: strin
           </Button>
         </div>
       )}
+
+      <Modal
+        isOpen={cancelModalOpen}
+        onClose={closeCancelModal}
+        title="Cancelar venda"
+      >
+        <div className="space-y-4">
+          {saleToCancel && (
+            <p className="text-sm text-gray-600">
+              Venda de <strong>{formatCurrency(saleToCancel.total)}</strong>{" "}
+              ({formatDateTime(saleToCancel.createdAt)}). O estoque e o valor em dinheiro serão revertidos.
+            </p>
+          )}
+          <Input
+            label="Sua senha"
+            type="password"
+            value={cancelPassword}
+            onChange={(e) => setCancelPassword(e.target.value)}
+            placeholder="Digite sua senha para confirmar"
+            autoComplete="current-password"
+          />
+          {cancelError && (
+            <>
+              <p className="text-sm text-red-600">{cancelError}</p>
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-3">
+                <p className="text-sm font-medium text-amber-800">
+                  Não tem senha cadastrada? (ex.: entrou com Google)
+                </p>
+                <p className="text-sm text-amber-700">
+                  Cadastre uma senha abaixo. Depois use-a no campo acima para confirmar o cancelamento.
+                </p>
+                {setPasswordSuccess && (
+                  <p className="text-sm text-green-700 font-medium">Senha cadastrada. Agora digite-a acima e confirme o cancelamento.</p>
+                )}
+                <Input
+                  label="Nova senha"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                  autoComplete="new-password"
+                  disabled={setPasswordSuccess}
+                />
+                <Input
+                  label="Confirmar senha"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Repita a senha"
+                  autoComplete="new-password"
+                  disabled={setPasswordSuccess}
+                />
+                {setPasswordError && (
+                  <p className="text-sm text-red-600">{setPasswordError}</p>
+                )}
+                {!setPasswordSuccess && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleSetPassword}
+                    loading={setPasswordLoading}
+                    disabled={!newPassword.trim() || !confirmPassword.trim()}
+                  >
+                    Cadastrar senha
+                  </Button>
+                )}
+              </div>
+            </>
+          )}
+          <div className="flex gap-2 justify-end">
+            <Button variant="secondary" onClick={closeCancelModal}>
+              Fechar
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleConfirmCancel}
+              loading={cancelLoading}
+              disabled={!cancelPassword.trim()}
+            >
+              Confirmar cancelamento
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
