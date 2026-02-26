@@ -88,28 +88,49 @@ model StoreUser {
 // =============================================================================
 
 model Product {
-  id          String   @id @default(cuid())
-  storeId     String
-  name        String
-  description String?
-  barcode     String?
-  sku         String?
-  cost        Float    @default(0)
-  price       Float
-  stock       Float    @default(0)
-  minStock    Float    @default(0)
-  unit        String   @default("un")
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id               String   @id @default(cuid())
+  storeId          String
+  name             String
+  description      String?
+  barcode          String?
+  sku              String?
+  cost             Float    @default(0)
+  price            Float
+  stock            Float    @default(0)
+  minStock         Float    @default(0)
+  unit             String   @default("un")
+  isActive         Boolean  @default(true)
+  baseProductId    String?
+  conversionFactor Float?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  store     Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  movements StockMovement[]
-  saleItems SaleItem[]
+  store              Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  baseProduct        Product?            @relation("DerivedProduct", fields: [baseProductId], references: [id], onDelete: Restrict)
+  derivedProducts    Product[]          @relation("DerivedProduct")
+  ingredients        ProductIngredient[] @relation("ProductAsKit")
+  usedInProducts     ProductIngredient[] @relation("ProductAsIngredient")
+  movements          StockMovement[]
+  saleItems          SaleItem[]
 
   @@index([storeId])
   @@index([storeId, barcode])
   @@index([storeId, name])
+  @@index([baseProductId])
+}
+
+model ProductIngredient {
+  id                 String @id @default(cuid())
+  productId          String
+  ingredientProductId String
+  quantityPerUnit    Float
+
+  product   Product @relation("ProductAsKit", fields: [productId], references: [id], onDelete: Cascade)
+  ingredient Product @relation("ProductAsIngredient", fields: [ingredientProductId], references: [id], onDelete: Restrict)
+
+  @@unique([productId, ingredientProductId])
+  @@index([productId])
+  @@index([ingredientProductId])
 }
 
 enum MovementType {

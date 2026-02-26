@@ -3,7 +3,7 @@
  */
 import { z } from "zod";
 
-export const createProductSchema = z.object({
+const baseProductObjectSchema = z.object({
   name: z.string().min(1, "Nome é obrigatório").max(200),
   description: z.string().optional(),
   barcode: z.string().optional(),
@@ -13,9 +13,43 @@ export const createProductSchema = z.object({
   stock: z.number().min(0, "Estoque não pode ser negativo"),
   minStock: z.number().min(0, "Estoque mínimo não pode ser negativo"),
   unit: z.string().default("un"),
+  baseProductId: z.string().optional(),
+  conversionFactor: z.number().positive("Fator deve ser maior que zero").optional(),
 });
 
-export const updateProductSchema = createProductSchema.partial();
+const derivedProductRefine = (data: { baseProductId?: string | null; conversionFactor?: number | null }) => {
+  if (data.baseProductId && data.conversionFactor == null) return false;
+  if (!data.baseProductId && data.conversionFactor != null) return false;
+  return true;
+};
+
+export const createProductSchema = baseProductObjectSchema.refine(
+  derivedProductRefine,
+  { message: "Produto derivado exige produto base e fator de conversão", path: ["conversionFactor"] }
+);
+
+export const updateProductSchema = baseProductObjectSchema
+  .partial()
+  .extend({
+    baseProductId: z.string().nullable().optional(),
+    conversionFactor: z.number().positive("Fator deve ser maior que zero").nullable().optional(),
+  })
+  .refine(
+    derivedProductRefine,
+    { message: "Produto derivado exige produto base e fator de conversão", path: ["conversionFactor"] }
+  );
+
+export const productIngredientSchema = z.object({
+  ingredientProductId: z.string().min(1, "Produto ingrediente é obrigatório"),
+  quantityPerUnit: z.number().positive("Quantidade por unidade deve ser maior que zero"),
+});
+
+export const setProductIngredientsSchema = z.object({
+  ingredients: z.array(productIngredientSchema),
+});
+
+export type ProductIngredientInput = z.infer<typeof productIngredientSchema>;
+export type SetProductIngredientsInput = z.infer<typeof setProductIngredientsSchema>;
 
 export const stockAdjustmentSchema = z.object({
   productId: z.string().min(1, "Produto é obrigatório"),

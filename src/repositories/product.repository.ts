@@ -12,9 +12,19 @@ export const productRepository = {
     });
   },
 
+  async findByIdWithBaseAndIngredients(id: string) {
+    return prisma.product.findUnique({
+      where: { id },
+      include: {
+        baseProduct: true,
+        ingredients: { include: { ingredient: true } },
+      },
+    });
+  },
+
   async findByStoreId(
     storeId: string,
-    options?: { search?: string; page?: number; pageSize?: number; activeOnly?: boolean }
+    options?: { search?: string; page?: number; pageSize?: number; activeOnly?: boolean; forPdv?: boolean }
   ): Promise<{ data: Product[]; total: number }> {
     const page = options?.page ?? 1;
     const pageSize = options?.pageSize ?? 20;
@@ -35,12 +45,20 @@ export const productRepository = {
         : {}),
     };
 
+    const include = options?.forPdv
+      ? {
+          baseProduct: { select: { stock: true } },
+          ingredients: { include: { ingredient: { select: { stock: true } } } },
+        }
+      : undefined;
+
     const [data, total] = await Promise.all([
       prisma.product.findMany({
         where,
         skip,
         take: pageSize,
         orderBy: { name: "asc" },
+        ...(include ? { include } : {}),
       }),
       prisma.product.count({ where }),
     ]);
@@ -49,8 +67,13 @@ export const productRepository = {
   },
 
   async create(storeId: string, data: CreateProductInput): Promise<Product> {
+    const isDerived = data.baseProductId != null && data.conversionFactor != null;
     return prisma.product.create({
-      data: { ...data, storeId },
+      data: {
+        ...data,
+        storeId,
+        ...(isDerived ? { stock: 0 } : {}),
+      },
     });
   },
 

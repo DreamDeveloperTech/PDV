@@ -25,11 +25,13 @@ export async function GET(request: NextRequest) {
 
     if (action === "current") {
       const session = await cashSessionService.getOpenSession(storeId);
+      const canCloseSession = ["MASTER", "OWNER"].includes(context.role);
       const data = session
         ? {
             ...session,
             currentUserName: context.user.name || context.user.email,
             currentUserId: context.user.id,
+            canCloseSession,
           }
         : null;
       return NextResponse.json({ data });
@@ -91,7 +93,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const context = await authService.getStoreUserContext(storeId);
-    authService.requireRole(context, ["MASTER", "OWNER", "EMPLOYEE"]);
+    authService.requireRole(context, ["MASTER", "OWNER"]);
 
     const body = await request.json();
     const input = closeCashSessionSchema.parse(body);

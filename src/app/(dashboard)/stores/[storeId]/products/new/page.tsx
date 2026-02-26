@@ -1,22 +1,30 @@
 /**
  * Create new product page.
+ * Supports normal product, derived product (e.g. box = N units), and later ingredients on edit.
  */
 "use client";
 
-import { useState, use } from "react";
+import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { apiRequest } from "@/hooks/use-fetch";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
+
+interface ProductOption {
+  id: string;
+  name: string;
+}
 
 export default function NewProductPage({ params }: { params: Promise<{ storeId: string }> }) {
   const { storeId } = use(params);
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [products, setProducts] = useState<ProductOption[]>([]);
   const [form, setForm] = useState({
     name: "",
     description: "",
@@ -27,7 +35,16 @@ export default function NewProductPage({ params }: { params: Promise<{ storeId: 
     stock: "",
     minStock: "",
     unit: "un",
+    baseProductId: "",
+    conversionFactor: "",
   });
+
+  useEffect(() => {
+    fetch(`/api/products?storeId=${storeId}&pageSize=500`)
+      .then((r) => r.json())
+      .then((j) => setProducts(j.data ?? []))
+      .catch(() => setProducts([]));
+  }, [storeId]);
 
   function updateField(field: string, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -39,17 +56,22 @@ export default function NewProductPage({ params }: { params: Promise<{ storeId: 
     setError("");
 
     try {
-      const body = {
+      const isDerived = form.baseProductId && form.conversionFactor;
+      const body: Record<string, unknown> = {
         name: form.name,
         description: form.description || undefined,
         barcode: form.barcode || undefined,
         sku: form.sku || undefined,
         cost: Number(form.cost) || 0,
         price: Number(form.price),
-        stock: Number(form.stock) || 0,
+        stock: isDerived ? 0 : Number(form.stock) || 0,
         minStock: Number(form.minStock) || 0,
         unit: form.unit,
       };
+      if (isDerived) {
+        body.baseProductId = form.baseProductId;
+        body.conversionFactor = Number(form.conversionFactor);
+      }
 
       await apiRequest(`/api/products?storeId=${storeId}`, { body });
       router.push(`/stores/${storeId}/products`);
@@ -88,8 +110,38 @@ export default function NewProductPage({ params }: { params: Promise<{ storeId: 
             <Input label="Preço (R$)" type="number" step="0.01" min="0.01" value={form.price} onChange={(e) => updateField("price", e.target.value)} required />
           </div>
 
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-3">
+            <p className="text-sm font-medium text-gray-700">Produto derivado (ex.: caixa = 12 unidades)</p>
+            <Select
+              label="Produto base (opcional)"
+              value={form.baseProductId}
+              onChange={(e) => updateField("baseProductId", e.target.value)}
+              options={[{ value: "", label: "Não é derivado" }, ...products.map((p) => ({ value: p.id, label: p.name }))]}
+              placeholder="Não é derivado"
+            />
+            {form.baseProductId && (
+              <Input
+                label="Fator de conversão (1 deste = quantas un. do base?)"
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={form.conversionFactor}
+                onChange={(e) => updateField("conversionFactor", e.target.value)}
+                placeholder="Ex: 12"
+              />
+            )}
+          </div>
+
           <div className="grid grid-cols-3 gap-4">
-            <Input label="Estoque Inicial" type="number" step="0.01" min="0" value={form.stock} onChange={(e) => updateField("stock", e.target.value)} />
+            <Input
+              label="Estoque Inicial"
+              type="number"
+              step="0.01"
+              min="0"
+              value={form.stock}
+              onChange={(e) => updateField("stock", e.target.value)}
+              disabled={!!(form.baseProductId && form.conversionFactor)}
+            />
             <Input label="Estoque Mínimo" type="number" step="0.01" min="0" value={form.minStock} onChange={(e) => updateField("minStock", e.target.value)} />
             <Input label="Unidade" value={form.unit} onChange={(e) => updateField("unit", e.target.value)} />
           </div>

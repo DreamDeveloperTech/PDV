@@ -1,5 +1,6 @@
 /**
  * Edit product page.
+ * Supports derived product (base + factor) and ingredients (doses/recipe).
  */
 "use client";
 
@@ -8,9 +9,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { apiRequest } from "@/hooks/use-fetch";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 
 interface ProductResponse {
   id: string;
@@ -23,6 +25,25 @@ interface ProductResponse {
   stock: number;
   minStock: number;
   unit: string;
+  baseProductId?: string | null;
+  conversionFactor?: number | null;
+}
+
+interface ProductOption {
+  id: string;
+  name: string;
+}
+
+interface IngredientRow {
+  ingredientProductId: string;
+  quantityPerUnit: string;
+  ingredientName?: string;
+}
+
+interface IngredientResponse {
+  ingredientProductId: string;
+  quantityPerUnit: number;
+  ingredient: { id: string; name: string };
 }
 
 export default function EditProductPage({
@@ -45,8 +66,13 @@ export default function EditProductPage({
     price: "",
     minStock: "",
     unit: "un",
+    baseProductId: "",
+    conversionFactor: "",
   });
   const [currentStock, setCurrentStock] = useState<number | null>(null);
+  const [products, setProducts] = useState<ProductOption[]>([]);
+  const [ingredients, setIngredients] = useState<IngredientRow[]>([]);
+  const [ingredientsLoading, setIngredientsLoading] = useState(false);
 
   function updateField(field: string, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -70,8 +96,26 @@ export default function EditProductPage({
           price: String(response.price ?? 0),
           minStock: String(response.minStock ?? 0),
           unit: response.unit ?? "un",
+          baseProductId: response.baseProductId ?? "",
+          conversionFactor: response.conversionFactor != null ? String(response.conversionFactor) : "",
         });
         setCurrentStock(response.stock);
+
+        const [prodRes, ingRes] = await Promise.all([
+          fetch(`/api/products?storeId=${storeId}&pageSize=500`),
+          fetch(`/api/products/${productId}/ingredients?storeId=${storeId}`),
+        ]);
+        const prodJson = await prodRes.json();
+        setProducts(prodJson.data ?? []);
+        const ingJson = await ingRes.json();
+        const ingData: IngredientResponse[] = ingJson.data ?? [];
+        setIngredients(
+          ingData.map((i) => ({
+            ingredientProductId: i.ingredientProductId,
+            quantityPerUnit: String(i.quantityPerUnit),
+            ingredientName: i.ingredient?.name,
+          }))
+        );
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Erro ao carregar produto"
@@ -90,7 +134,8 @@ export default function EditProductPage({
     setError("");
 
     try {
-      const body = {
+      const isDerived = Boolean(form.baseProductId && form.conversionFactor);
+      const body: Record<string, unknown> = {
         name: form.name || undefined,
         description: form.description || undefined,
         barcode: form.barcode || undefined,
@@ -100,6 +145,13 @@ export default function EditProductPage({
         minStock: form.minStock ? Number(form.minStock) : undefined,
         unit: form.unit || undefined,
       };
+      if (isDerived) {
+        body.baseProductId = form.baseProductId;
+        body.conversionFactor = Number(form.conversionFactor);
+      } else {
+        body.baseProductId = null;
+        body.conversionFactor = null;
+      }
 
       await apiRequest(`/api/products/${productId}?storeId=${storeId}`, {
         method: "PATCH",
@@ -113,6 +165,64 @@ export default function EditProductPage({
       );
     } finally {
       setLoading(false);
+    }
+  }
+
+  const baseProductOptions = products.filter((p) => p.id !== productId);
+  const ingredientProductOptions = products.filter((p) => p.id !== productId);
+
+  function addIngredientRow() {
+    setIngredients((prev) => [
+      ...prev,
+      { ingredientProductId: "", quantityPerUnit: "", ingredientName: undefined },
+    ]);
+  }
+
+  function removeIngredientRow(index: number) {
+    setIngredients((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function updateIngredientRow(
+    index: number,
+    field: "ingredientProductId" | "quantityPerUnit",
+    value: string
+  ) {
+    setIngredients((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      if (field === "ingredientProductId") {
+        const product = products.find((p) => p.id === value);
+        next[index].ingredientName = product?.name;
+      }
+      return next;
+    });
+  }
+
+  async function handleSaveIngredients() {
+    setIngredientsLoading(true);
+    setError("");
+    try {
+      const payload = ingredients
+        .filter((r) => r.ingredientProductId && r.quantityPerUnit)
+        .map((r) => ({
+          ingredientProductId: r.ingredientProductId,
+          quantityPerUnit: Number(r.quantityPerUnit),
+        }));
+      await apiRequest(`/api/products/${productId}/ingredients?storeId=${storeId}`, {
+        method: "PUT",
+        body: { ingredients: payload },
+      });
+      setIngredients(
+        payload.map((p) => ({
+          ingredientProductId: p.ingredientProductId,
+          quantityPerUnit: String(p.quantityPerUnit),
+          ingredientName: products.find((x) => x.id === p.ingredientProductId)?.name,
+        }))
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao salvar ingredientes");
+    } finally {
+      setIngredientsLoading(false);
     }
   }
 
@@ -201,6 +311,93 @@ export default function EditProductPage({
                 value={form.unit}
                 onChange={(e) => updateField("unit", e.target.value)}
               />
+            </div>
+
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-3">
+              <p className="text-sm font-medium text-gray-700">
+                Produto derivado (ex.: caixa = 12 unidades)
+              </p>
+              <Select
+                label="Produto base (opcional)"
+                value={form.baseProductId}
+                onChange={(e) => updateField("baseProductId", e.target.value)}
+                options={[
+                  { value: "", label: "Não é derivado" },
+                  ...baseProductOptions.map((p) => ({ value: p.id, label: p.name })),
+                ]}
+                placeholder="Não é derivado"
+              />
+              <Input
+                label="Fator de conversão (unidades por 1 deste produto)"
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={form.conversionFactor}
+                onChange={(e) => updateField("conversionFactor", e.target.value)}
+                disabled={!form.baseProductId}
+                placeholder="Ex.: 12"
+              />
+            </div>
+
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-3">
+              <p className="text-sm font-medium text-gray-700">
+                Ingredientes / Receita (ex.: dose = gelo + bebida; quantidade por unidade)
+              </p>
+              {ingredients.map((row, index) => (
+                <div key={index} className="flex gap-2 items-end">
+                  <div className="flex-1 min-w-0">
+                    <Select
+                      label={index === 0 ? "Produto" : ""}
+                      value={row.ingredientProductId}
+                      onChange={(e) =>
+                        updateIngredientRow(index, "ingredientProductId", e.target.value)
+                      }
+                      options={[
+                        { value: "", label: "Selecione..." },
+                        ...ingredientProductOptions.map((p) => ({ value: p.id, label: p.name })),
+                      ]}
+                    />
+                  </div>
+                  <div className="w-32">
+                    <Input
+                      label={index === 0 ? "Qtd. por unidade" : ""}
+                      type="number"
+                      step="0.001"
+                      min="0.001"
+                      value={row.quantityPerUnit}
+                      onChange={(e) =>
+                        updateIngredientRow(index, "quantityPerUnit", e.target.value)
+                      }
+                      placeholder="Ex.: 0.083"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => removeIngredientRow(index)}
+                    aria-label="Remover ingrediente"
+                  >
+                    <Trash2 size={16} />
+                  </Button>
+                </div>
+              ))}
+              <div className="flex gap-2">
+                <Button type="button" variant="secondary" size="sm" onClick={addIngredientRow}>
+                  <Plus size={16} className="mr-1" />
+                  Adicionar ingrediente
+                </Button>
+                {ingredients.length > 0 && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleSaveIngredients}
+                    loading={ingredientsLoading}
+                  >
+                    Salvar ingredientes
+                  </Button>
+                )}
+              </div>
             </div>
 
             <Button type="submit" loading={loading} className="w-full">

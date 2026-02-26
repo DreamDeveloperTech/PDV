@@ -23,8 +23,9 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") ?? undefined;
     const page = Number(searchParams.get("page") ?? "1");
     const pageSize = Number(searchParams.get("pageSize") ?? "20");
+    const forPdv = searchParams.get("forPdv") === "1";
 
-    const result = await productService.getProducts(storeId, { search, page, pageSize });
+    const result = await productService.getProducts(storeId, { search, page, pageSize, forPdv });
     return NextResponse.json({
       data: result.data,
       total: result.total,

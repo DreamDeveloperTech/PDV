@@ -30,6 +30,8 @@ interface Product {
   name: string;
   price: number;
   stock: number;
+  /** Estoque efetivo (derivados/receitas); quando presente, usar no PDV no lugar de stock */
+  effectiveStock?: number;
   barcode: string | null;
 }
 
@@ -65,6 +67,8 @@ interface CashSession {
   isExpiredForSales?: boolean;
   /** true = esta sessão já estava aberta (valor compartilhado com todos) */
   alreadyOpen?: boolean;
+  /** apenas MASTER/OWNER podem fechar; funcionário não vê o botão */
+  canCloseSession?: boolean;
 }
 
 interface CartItem {
@@ -124,7 +128,7 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
     setLoading(true);
     try {
       const [prodRes, custRes, sessRes] = await Promise.all([
-        fetch(`/api/products?storeId=${storeId}&pageSize=200`),
+        fetch(`/api/products?storeId=${storeId}&pageSize=200&forPdv=1`),
         fetch(`/api/customers?storeId=${storeId}&pageSize=200`),
         fetch(`/api/cash-sessions?storeId=${storeId}&action=current`),
       ]);
@@ -209,12 +213,17 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
   const paymentTotal = payments.reduce((sum, p) => sum + p.amount, 0);
   const remaining = total - paymentTotal;
 
+  function getAvailableStock(product: Product) {
+    return product.effectiveStock ?? product.stock;
+  }
+
   function addToCart(product: Product) {
     const existingInCart = cart.find((item) => item.productId === product.id);
     const currentQty = existingInCart?.quantity ?? 0;
+    const available = getAvailableStock(product);
 
-    if (currentQty >= product.stock) {
-      setError(`Estoque insuficiente para ${product.name}. Disponível: ${product.stock}`);
+    if (currentQty >= available) {
+      setError(`Estoque insuficiente para ${product.name}. Disponível: ${available}`);
       return;
     }
 
@@ -250,8 +259,9 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
           const newQty = item.quantity + delta;
           if (newQty <= 0) return null;
 
-          if (product && newQty > product.stock) {
-            setError(`Estoque insuficiente para ${product.name}. Disponível: ${product.stock}`);
+          const available = product ? getAvailableStock(product) : 0;
+          if (product && newQty > available) {
+            setError(`Estoque insuficiente para ${product.name}. Disponível: ${available}`);
             return item;
           }
 
@@ -474,15 +484,20 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
             ) : (
               <Badge variant="success">Caixa Aberto</Badge>
             )}
-            <Button variant="danger" size="sm" onClick={() => setCloseSessionModal(true)}>
-              Fechar Caixa
-            </Button>
+            {session.canCloseSession && (
+              <Button variant="danger" size="sm" onClick={() => setCloseSessionModal(true)}>
+                Fechar Caixa
+              </Button>
+            )}
           </div>
         </div>
 
         {session.isExpiredForSales && (
           <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-            <strong>Este caixa está aberto há mais de 24h.</strong> Feche-o e abra um novo para continuar vendendo.
+            <strong>Este caixa está aberto há mais de 24h.</strong>
+            {session.canCloseSession
+              ? " Feche-o e abra um novo para continuar vendendo."
+              : " Peça a um responsável (dono ou gerente) para fechar o caixa."}
           </div>
         )}
 
@@ -507,7 +522,7 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
                 >
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
-                    <p className="text-xs text-gray-500">Estoque: {product.stock}</p>
+                    <p className="text-xs text-gray-500">Estoque: {getAvailableStock(product)}</p>
                   </div>
                   <span className="shrink-0 text-sm font-semibold text-blue-600">
                     {formatCurrency(product.price)}
@@ -515,7 +530,7 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
                   <Button
                     size="sm"
                     onClick={() => addToCart(product)}
-                    disabled={product.stock <= 0 || session.isExpiredForSales}
+                    disabled={getAvailableStock(product) <= 0 || session.isExpiredForSales}
                     className="shrink-0"
                   >
                     <Plus size={16} className="mr-1" />

@@ -41,23 +41,25 @@ export const saleService = {
       );
     }
 
-    // 2. Load and validate all products
+    // 2. Load and validate all products (use effective stock for derived/recipe)
     const productIds = input.items.map((item) => item.productId);
-    const products = await Promise.all(
-      productIds.map((id) => productRepository.findById(id))
-    );
+    const [products, effectiveStocks] = await Promise.all([
+      Promise.all(productIds.map((id) => productRepository.findById(id))),
+      Promise.all(productIds.map((id) => productService.getEffectiveStock(id))),
+    ]);
 
     const itemsWithProduct = input.items.map((item, index) => {
       const product = products[index];
+      const available = effectiveStocks[index];
       if (!product) {
         throw new NotFoundError(`Produto ${item.productId}`);
       }
       if (product.storeId !== storeId) {
         throw new ValidationError("Produto não pertence a esta loja");
       }
-      if (product.stock < item.quantity) {
+      if (available < item.quantity) {
         throw new ValidationError(
-          `Estoque insuficiente para ${product.name}. Disponível: ${product.stock}`
+          `Estoque insuficiente para ${product.name}. Disponível: ${available}`
         );
       }
       return {
