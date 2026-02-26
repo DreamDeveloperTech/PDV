@@ -37,7 +37,7 @@ export function BottomNav({ storeId, role }: BottomNavProps) {
       href: `/stores/${storeId}/dashboard`,
       label: "Dashboard",
       icon: <LayoutDashboard size={18} />,
-      roles: ["MASTER", "OWNER", "EMPLOYEE"],
+      roles: ["MASTER", "OWNER"],
     },
     {
       href: `/stores/${storeId}/pos`,

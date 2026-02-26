@@ -41,7 +41,7 @@ export function Sidebar({ storeId, storeName, role, userName }: SidebarProps) {
       href: `/stores/${storeId}/dashboard`,
       label: "Dashboard",
       icon: <LayoutDashboard size={20} />,
-      roles: ["MASTER", "OWNER", "EMPLOYEE"],
+      roles: ["MASTER", "OWNER"],
     },
     {
       href: `/stores/${storeId}/pos`,
