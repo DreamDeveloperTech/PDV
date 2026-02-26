@@ -182,12 +182,12 @@ export default function SalesPage({ params }: { params: Promise<{ storeId: strin
       </div>
 
       {/* Filtros */}
-      <Card className="mb-4 p-4">
-        <div className="mb-3 flex items-center gap-2 text-sm font-medium text-gray-700">
+      <Card className="mb-4 p-3 sm:p-4">
+        <div className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-700">
           <Search size={16} />
           Filtros
         </div>
-        <div className="grid gap-3 ">
+        <div className="grid gap-2 sm:gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Input
             label="De"
             type="date"
