@@ -25,7 +25,7 @@ import { Plus } from "lucide-react";
 
 interface Movement {
   id: string;
-  type: "SALE" | "RESTOCK" | "ADJUSTMENT";
+  type: "SALE" | "RESTOCK" | "ADJUSTMENT" | "CANCELLATION";
   quantity: number;
   previousStock: number;
   newStock: number;
@@ -70,8 +70,8 @@ export default function StockPage({ params }: { params: Promise<{ storeId: strin
       ]);
       const movJson = await movRes.json();
       const prodJson = await prodRes.json();
-      setMovements(movJson.data);
-      setProducts(prodJson.data);
+      setMovements(movJson.data ?? []);
+      setProducts(prodJson.data ?? []);
     } catch {
       // Silent error
     } finally {
@@ -107,11 +107,16 @@ export default function StockPage({ params }: { params: Promise<{ storeId: strin
     }
   }
 
-  const typeLabels: Record<string, { label: string; variant: "success" | "info" | "warning" }> = {
+  const typeLabels: Record<string, { label: string; variant: "success" | "info" | "warning" | "default" }> = {
     SALE: { label: "Venda", variant: "info" },
     RESTOCK: { label: "Reposição", variant: "success" },
     ADJUSTMENT: { label: "Ajuste", variant: "warning" },
+    CANCELLATION: { label: "Cancelamento", variant: "default" },
   };
+
+  function getTypeLabel(type: string) {
+    return typeLabels[type] ?? { label: type, variant: "default" as const };
+  }
 
   return (
     <div>
@@ -198,8 +203,8 @@ export default function StockPage({ params }: { params: Promise<{ storeId: strin
                   <TableCell>{formatDateTime(movement.createdAt)}</TableCell>
                   <TableCell className="font-medium">{movement.product.name}</TableCell>
                   <TableCell>
-                    <Badge variant={typeLabels[movement.type].variant}>
-                      {typeLabels[movement.type].label}
+                    <Badge variant={getTypeLabel(movement.type).variant}>
+                      {getTypeLabel(movement.type).label}
                     </Badge>
                   </TableCell>
                   <TableCell className={movement.quantity > 0 ? "text-green-600" : "text-red-600"}>

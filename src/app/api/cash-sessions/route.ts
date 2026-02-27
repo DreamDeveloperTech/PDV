@@ -37,6 +37,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ data });
     }
 
+    authService.requireRole(context, ["MASTER", "OWNER"]);
+
     const page = Number(searchParams.get("page") ?? "1");
     const pageSize = Number(searchParams.get("pageSize") ?? "20");
     const result = await cashSessionService.getSessionHistory(storeId, { page, pageSize });

@@ -16,8 +16,9 @@ import {
   TableCell,
   EmptyState,
 } from "@/components/ui/table";
+import Link from "next/link";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
-import { Banknote } from "lucide-react";
+import { Banknote, ShieldX } from "lucide-react";
 
 interface CashSessionRow {
   id: string;
@@ -42,11 +43,13 @@ export default function CashSessionsPage({ params }: { params: Promise<{ storeId
   const { storeId } = use(params);
   const [sessions, setSessions] = useState<CashSessionRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [forbidden, setForbidden] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
   const fetchSessions = useCallback(async () => {
     setLoading(true);
+    setForbidden(false);
     try {
       const queryParams = new URLSearchParams({
         storeId,
@@ -54,9 +57,13 @@ export default function CashSessionsPage({ params }: { params: Promise<{ storeId
         pageSize: "20",
       });
       const response = await fetch(`/api/cash-sessions?${queryParams.toString()}`);
+      if (response.status === 403) {
+        setForbidden(true);
+        return;
+      }
       const json: ApiResponse = await response.json();
-      setSessions(json.data);
-      setTotalPages(json.totalPages);
+      setSessions(json.data ?? []);
+      setTotalPages(json.totalPages ?? 1);
     } catch {
       // Silent
     } finally {
@@ -67,6 +74,21 @@ export default function CashSessionsPage({ params }: { params: Promise<{ storeId
   useEffect(() => {
     fetchSessions();
   }, [fetchSessions]);
+
+  if (forbidden) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <ShieldX size={48} className="text-amber-500 mb-4" />
+        <h1 className="text-xl font-bold text-gray-900 mb-2">Acesso restrito</h1>
+        <p className="text-sm text-gray-600 mb-6 max-w-sm">
+          Apenas dono ou gerente podem acessar Fechamentos de Caixa.
+        </p>
+        <Link href={`/stores/${storeId}/pos`}>
+          <Button>Ir para o PDV</Button>
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div>

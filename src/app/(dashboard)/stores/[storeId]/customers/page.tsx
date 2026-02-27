@@ -19,7 +19,7 @@ import {
   EmptyState,
 } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/utils";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Pencil } from "lucide-react";
 
 interface Customer {
   id: string;
@@ -90,6 +90,7 @@ export default function CustomersPage({ params }: { params: Promise<{ storeId: s
               <TableHead>Telefone</TableHead>
               <TableHead>Limite de Crédito</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead className="w-[80px]">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -110,6 +111,14 @@ export default function CustomersPage({ params }: { params: Promise<{ storeId: s
                     ) : (
                       <Badge variant="success">Liberado</Badge>
                     )}
+                  </TableCell>
+                  <TableCell>
+                    <Link href={`/stores/${storeId}/customers/${customer.id}/edit`}>
+                      <Button variant="secondary" size="sm">
+                        <Pencil size={14} className="mr-1" />
+                        Editar
+                      </Button>
+                    </Link>
                   </TableCell>
                 </TableRow>
               ))

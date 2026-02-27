@@ -60,8 +60,11 @@ export const customerRepository = {
     return prisma.customer.update({
       where: { id },
       data: {
-        ...data,
-        email: data.email || null,
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.document !== undefined && { document: data.document || null }),
+        ...(data.phone !== undefined && { phone: data.phone || null }),
+        ...(data.email !== undefined && { email: data.email || null }),
+        ...(data.creditLimit !== undefined && { creditLimit: data.creditLimit }),
       },
     });
   },

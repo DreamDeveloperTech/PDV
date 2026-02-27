@@ -49,7 +49,7 @@ export function BottomNav({ storeId, role }: BottomNavProps) {
       href: `/stores/${storeId}/cash-sessions`,
       label: "Caixa",
       icon: <Banknote size={18} />,
-      roles: ["MASTER", "OWNER", "EMPLOYEE"],
+      roles: ["MASTER", "OWNER"],
     },
     {
       href: `/stores/${storeId}/sales`,
