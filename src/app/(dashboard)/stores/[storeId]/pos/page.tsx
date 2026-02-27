@@ -391,6 +391,7 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
           items: cart.map((item) => ({
             productId: item.productId,
             quantity: item.quantity,
+            unitPrice: item.price,
           })),
           payments,
           discount,

@@ -6,6 +6,8 @@ import { z } from "zod";
 export const saleItemSchema = z.object({
   productId: z.string().min(1, "Produto é obrigatório"),
   quantity: z.number().min(0.01, "Quantidade deve ser maior que zero"),
+  /** Preço unitário usado na venda (ex.: preço de custo). Se omitido, o backend usa product.price */
+  unitPrice: z.number().min(0, "Preço unitário não pode ser negativo").optional(),
 });
 
 export const salePaymentSchema = z.object({

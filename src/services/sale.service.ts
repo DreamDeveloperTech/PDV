@@ -62,12 +62,13 @@ export const saleService = {
           `Estoque insuficiente para ${product.name}. Disponível: ${available}`
         );
       }
+      const unitPrice = item.unitPrice ?? product.price;
       return {
         productId: product.id,
         productName: product.name,
         quantity: item.quantity,
-        unitPrice: product.price,
-        total: product.price * item.quantity,
+        unitPrice,
+        total: unitPrice * item.quantity,
       };
     });
 
