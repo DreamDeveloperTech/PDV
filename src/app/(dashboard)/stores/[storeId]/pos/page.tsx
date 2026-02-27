@@ -224,6 +224,19 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
     return sellAtCost ? (product.cost ?? 0) : product.price;
   }
 
+  // Ao alternar "preço de custo", recalcular preço de todos os itens do carrinho
+  // para que o total e o valor enviado na venda (ex.: fiado) reflitam o preço correto.
+  useEffect(() => {
+    setCart((prev) =>
+      prev.map((item) => {
+        const product = products.find((p) => p.id === item.productId);
+        if (!product) return item;
+        const unitPrice = sellAtCost ? (product.cost ?? 0) : product.price;
+        return { ...item, price: unitPrice, total: item.quantity * unitPrice };
+      })
+    );
+  }, [sellAtCost, products]);
+
   function addToCart(product: Product) {
     const existingInCart = cart.find((item) => item.productId === product.id);
     const currentQty = existingInCart?.quantity ?? 0;
