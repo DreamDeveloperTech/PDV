@@ -7,7 +7,7 @@ import { productIngredientRepository } from "@/repositories/product-ingredient.r
 import { stockMovementRepository } from "@/repositories/stock-movement.repository";
 import { NotFoundError, ValidationError, BusinessRuleError } from "@/lib/errors";
 import type { CreateProductInput, UpdateProductInput, StockAdjustmentInput } from "@/schemas/product.schema";
-import type { MovementType } from "@/generated/prisma/client";
+import type { MovementType, Product } from "@/generated/prisma/client";
 
 export const productService = {
   async getProducts(
