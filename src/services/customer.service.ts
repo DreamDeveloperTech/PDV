@@ -6,7 +6,7 @@ import { NotFoundError, ValidationError } from "@/lib/errors";
 import type { CreateCustomerInput, UpdateCustomerInput } from "@/schemas/customer.schema";
 
 export const customerService = {
-  async getCustomers(storeId: string, options?: { search?: string; page?: number; pageSize?: number }) {
+  async getCustomers(storeId: string, options?: { search?: string; page?: number; pageSize?: number; all?: boolean }) {
     return customerRepository.findByStoreId(storeId, options);
   },
 

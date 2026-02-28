@@ -18,8 +18,10 @@ import {
   TableCell,
   EmptyState,
 } from "@/components/ui/table";
+import { Modal } from "@/components/ui/modal";
+import { apiRequest } from "@/hooks/use-fetch";
 import { formatCurrency } from "@/lib/utils";
-import { Plus, Search, AlertTriangle } from "lucide-react";
+import { Plus, Search, AlertTriangle, Trash2 } from "lucide-react";
 
 interface Product {
   id: string;
@@ -47,6 +49,9 @@ export default function ProductsPage({ params }: { params: Promise<{ storeId: st
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -71,6 +76,23 @@ export default function ProductsPage({ params }: { params: Promise<{ storeId: st
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
+
+  async function handleConfirmDelete() {
+    if (!productToDelete || !storeId) return;
+    setDeleteLoading(true);
+    setDeleteError("");
+    try {
+      await apiRequest(`/api/products/${productToDelete.id}?storeId=${storeId}`, {
+        method: "DELETE",
+      });
+      setProductToDelete(null);
+      fetchProducts();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Erro ao excluir produto");
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
 
   return (
     <div>
@@ -139,11 +161,24 @@ export default function ProductsPage({ params }: { params: Promise<{ storeId: st
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Link href={`/stores/${storeId}/products/${product.id}/edit`}>
-                      <Button variant="ghost" size="sm">
-                        Editar
-                      </Button>
-                    </Link>
+                    <div className="flex items-center justify-end gap-1">
+                      <Link href={`/stores/${storeId}/products/${product.id}/edit`}>
+                        <Button variant="ghost" size="sm">
+                          Editar
+                        </Button>
+                      </Link>
+                      {product.isActive && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => setProductToDelete(product)}
+                        >
+                          <Trash2 size={14} className="mr-1" />
+                          Excluir
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -176,6 +211,53 @@ export default function ProductsPage({ params }: { params: Promise<{ storeId: st
           </Button>
         </div>
       )}
+
+      <Modal
+        isOpen={!!productToDelete}
+        onClose={() => {
+          setProductToDelete(null);
+          setDeleteError("");
+        }}
+        title="Confirmar exclusão"
+      >
+        <div className="space-y-4">
+          {productToDelete && (
+            <>
+              <p className="text-sm text-gray-700">
+                Tem certeza que deseja excluir o produto <strong>{productToDelete.name}</strong>?
+              </p>
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                Esta operação não pode ser desfeita. O produto será removido permanentemente do sistema.
+              </div>
+              <p className="text-xs text-gray-500">
+                Não é possível excluir produto que já tenha vendas, que seja ingrediente de outro ou que possua produtos derivados.
+              </p>
+            </>
+          )}
+          {deleteError && (
+            <p className="text-sm text-red-600">{deleteError}</p>
+          )}
+          <div className="flex gap-2 justify-end pt-2">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setProductToDelete(null);
+                setDeleteError("");
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleConfirmDelete}
+              loading={deleteLoading}
+              disabled={deleteLoading}
+            >
+              Sim, excluir
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

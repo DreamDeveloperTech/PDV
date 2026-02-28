@@ -5,14 +5,14 @@
 import { productRepository } from "@/repositories/product.repository";
 import { productIngredientRepository } from "@/repositories/product-ingredient.repository";
 import { stockMovementRepository } from "@/repositories/stock-movement.repository";
-import { NotFoundError, ValidationError } from "@/lib/errors";
+import { NotFoundError, ValidationError, BusinessRuleError } from "@/lib/errors";
 import type { CreateProductInput, UpdateProductInput, StockAdjustmentInput } from "@/schemas/product.schema";
 import type { MovementType } from "@/generated/prisma/client";
 
 export const productService = {
   async getProducts(
     storeId: string,
-    options?: { search?: string; page?: number; pageSize?: number; forPdv?: boolean }
+    options?: { search?: string; page?: number; pageSize?: number; forPdv?: boolean; all?: boolean }
   ) {
     const result = await productRepository.findByStoreId(storeId, options);
     if (!options?.forPdv || !result.data.length) return result;
@@ -83,6 +83,26 @@ export const productService = {
       if (input.baseProductId === id) throw new ValidationError("Produto não pode ser base de si mesmo");
     }
     return productRepository.update(id, input);
+  },
+
+  /** Hard delete product. Only MASTER/OWNER. Blocks if product has sales, is ingredient of another, or has derived products. */
+  async deleteProduct(storeId: string, productId: string): Promise<Product> {
+    const product = await productRepository.findById(productId);
+    if (!product) throw new NotFoundError("Produto");
+    if (product.storeId !== storeId) throw new ValidationError("Produto não pertence a esta loja");
+
+    const constraints = await productRepository.getDeleteConstraints(productId);
+    if (constraints.saleItems > 0) {
+      throw new BusinessRuleError("Não é possível excluir: o produto possui vendas no histórico.");
+    }
+    if (constraints.usedAsIngredient > 0) {
+      throw new BusinessRuleError("Não é possível excluir: o produto é ingrediente de outro produto.");
+    }
+    if (constraints.derivedProducts > 0) {
+      throw new BusinessRuleError("Não é possível excluir: existem produtos derivados deste.");
+    }
+
+    return productRepository.delete(productId);
   },
 
   async getProductIngredients(productId: string) {

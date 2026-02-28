@@ -67,3 +67,26 @@ export async function PATCH(
   }
 }
 
+export async function DELETE(
+  request: NextRequest,
+  routeContext: { params: Promise<{ productId: string }> }
+) {
+  try {
+    const { productId } = await routeContext.params;
+    const { searchParams } = new URL(request.url);
+    const storeId = searchParams.get("storeId");
+
+    if (!storeId) {
+      throw new ValidationError("storeId é obrigatório");
+    }
+
+    const context = await authService.getStoreUserContext(storeId);
+    authService.requireRole(context, ["MASTER", "OWNER"]);
+
+    const deleted = await productService.deleteProduct(storeId, productId);
+    return NextResponse.json({ data: deleted });
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
+

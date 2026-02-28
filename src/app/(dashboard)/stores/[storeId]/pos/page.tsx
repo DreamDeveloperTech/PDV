@@ -131,8 +131,8 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
     setLoading(true);
     try {
       const [prodRes, custRes, sessRes] = await Promise.all([
-        fetch(`/api/products?storeId=${storeId}&pageSize=200&forPdv=1`),
-        fetch(`/api/customers?storeId=${storeId}&pageSize=200`),
+        fetch(`/api/products?storeId=${storeId}&all=1&forPdv=1`),
+        fetch(`/api/customers?storeId=${storeId}&all=1`),
         fetch(`/api/cash-sessions?storeId=${storeId}&action=current`),
       ]);
       const prodJson = await prodRes.json();

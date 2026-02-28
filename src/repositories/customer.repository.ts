@@ -14,11 +14,11 @@ export const customerRepository = {
 
   async findByStoreId(
     storeId: string,
-    options?: { search?: string; page?: number; pageSize?: number }
+    options?: { search?: string; page?: number; pageSize?: number; all?: boolean }
   ): Promise<{ data: Customer[]; total: number }> {
     const page = options?.page ?? 1;
-    const pageSize = options?.pageSize ?? 20;
-    const skip = (page - 1) * pageSize;
+    const pageSize = options?.all ? undefined : (options?.pageSize ?? 20);
+    const skip = options?.all ? undefined : (page - 1) * (pageSize ?? 20);
 
     const where = {
       storeId,
@@ -36,8 +36,8 @@ export const customerRepository = {
     const [data, total] = await Promise.all([
       prisma.customer.findMany({
         where,
-        skip,
-        take: pageSize,
+        ...(skip != null ? { skip } : {}),
+        ...(pageSize != null ? { take: pageSize } : {}),
         orderBy: { name: "asc" },
       }),
       prisma.customer.count({ where }),

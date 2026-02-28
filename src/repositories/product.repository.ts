@@ -24,11 +24,11 @@ export const productRepository = {
 
   async findByStoreId(
     storeId: string,
-    options?: { search?: string; page?: number; pageSize?: number; activeOnly?: boolean; forPdv?: boolean }
+    options?: { search?: string; page?: number; pageSize?: number; activeOnly?: boolean; forPdv?: boolean; all?: boolean }
   ): Promise<{ data: Product[]; total: number }> {
     const page = options?.page ?? 1;
-    const pageSize = options?.pageSize ?? 20;
-    const skip = (page - 1) * pageSize;
+    const pageSize = options?.all ? undefined : (options?.pageSize ?? 20);
+    const skip = options?.all ? undefined : (page - 1) * (pageSize ?? 20);
     const activeOnly = options?.activeOnly ?? true;
 
     const where = {
@@ -55,8 +55,8 @@ export const productRepository = {
     const [data, total] = await Promise.all([
       prisma.product.findMany({
         where,
-        skip,
-        take: pageSize,
+        ...(skip != null ? { skip } : {}),
+        ...(pageSize != null ? { take: pageSize } : {}),
         orderBy: { name: "asc" },
         ...(include ? { include } : {}),
       }),
@@ -89,6 +89,39 @@ export const productRepository = {
       where: { id },
       data: { stock: newStock },
     });
+  },
+
+  /** Hard delete: remove product. Fails if product has sales, is used as ingredient, or has derived products. */
+  async delete(id: string): Promise<Product> {
+    return prisma.product.delete({
+      where: { id },
+    });
+  },
+
+  /** Check if product can be deleted (no sale items, not used as ingredient, no derived products). */
+  async getDeleteConstraints(productId: string): Promise<{
+    saleItems: number;
+    usedAsIngredient: number;
+    derivedProducts: number;
+  }> {
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      select: {
+        _count: {
+          select: {
+            saleItems: true,
+            usedInProducts: true,
+            derivedProducts: true,
+          },
+        },
+      },
+    });
+    if (!product) return { saleItems: 0, usedAsIngredient: 0, derivedProducts: 0 };
+    return {
+      saleItems: product._count.saleItems,
+      usedAsIngredient: product._count.usedInProducts,
+      derivedProducts: product._count.derivedProducts,
+    };
   },
 
   /** Find products with stock at or below their minimum stock level */

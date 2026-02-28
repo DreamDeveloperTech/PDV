@@ -22,16 +22,23 @@ export async function GET(request: NextRequest) {
 
     const search = searchParams.get("search") ?? undefined;
     const page = Number(searchParams.get("page") ?? "1");
-    const pageSize = Number(searchParams.get("pageSize") ?? "20");
+    const all = searchParams.get("all") === "1";
+    const pageSize = all ? undefined : Number(searchParams.get("pageSize") ?? "20");
     const forPdv = searchParams.get("forPdv") === "1";
 
-    const result = await productService.getProducts(storeId, { search, page, pageSize, forPdv });
+    const result = await productService.getProducts(storeId, {
+      search,
+      page: all ? 1 : page,
+      pageSize,
+      forPdv,
+      all,
+    });
     return NextResponse.json({
       data: result.data,
       total: result.total,
-      page,
-      pageSize,
-      totalPages: Math.ceil(result.total / pageSize),
+      page: all ? 1 : page,
+      pageSize: pageSize ?? result.total,
+      totalPages: all ? 1 : Math.ceil(result.total / (pageSize ?? 20)),
     });
   } catch (error) {
     return handleApiError(error);

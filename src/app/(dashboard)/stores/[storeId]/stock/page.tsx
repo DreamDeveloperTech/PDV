@@ -3,7 +3,7 @@
  */
 "use client";
 
-import { useState, useEffect, useCallback, use } from "react";
+import { useState, useEffect, useCallback, useRef, use } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,6 +56,16 @@ export default function StockPage({ params }: { params: Promise<{ storeId: strin
     type: "RESTOCK" as "RESTOCK" | "ADJUSTMENT",
     reason: "",
   });
+  const [productSearch, setProductSearch] = useState("");
+  const [productDropdownOpen, setProductDropdownOpen] = useState(false);
+  const productDropdownRef = useRef<HTMLDivElement>(null);
+
+  const selectedProduct = products.find((p) => p.id === form.productId);
+  const filteredProducts = productSearch.trim()
+    ? products.filter((p) =>
+        p.name.toLowerCase().includes(productSearch.toLowerCase())
+      )
+    : products;
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -66,7 +76,7 @@ export default function StockPage({ params }: { params: Promise<{ storeId: strin
 
       const [movRes, prodRes] = await Promise.all([
         fetch(`/api/stock-movements?${params.toString()}`),
-        fetch(`/api/products?storeId=${storeId}&pageSize=100`),
+        fetch(`/api/products?storeId=${storeId}&all=1`),
       ]);
       const movJson = await movRes.json();
       const prodJson = await prodRes.json();
@@ -83,8 +93,31 @@ export default function StockPage({ params }: { params: Promise<{ storeId: strin
     fetchData();
   }, [fetchData]);
 
+  useEffect(() => {
+    if (!modalOpen) {
+      setProductSearch("");
+      setProductDropdownOpen(false);
+    }
+  }, [modalOpen]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (productDropdownRef.current && !productDropdownRef.current.contains(event.target as Node)) {
+        setProductDropdownOpen(false);
+      }
+    }
+    if (productDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [productDropdownOpen]);
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
+    if (!form.productId) {
+      setError("Selecione um produto na lista.");
+      return;
+    }
     setFormLoading(true);
     setError("");
 
@@ -99,6 +132,7 @@ export default function StockPage({ params }: { params: Promise<{ storeId: strin
       });
       setModalOpen(false);
       setForm({ productId: "", quantity: "", type: "RESTOCK", reason: "" });
+      setProductSearch("");
       fetchData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao ajustar estoque");
@@ -225,14 +259,54 @@ export default function StockPage({ params }: { params: Promise<{ storeId: strin
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
-          <Select
-            label="Produto"
-            value={form.productId}
-            onChange={(e) => setForm((prev) => ({ ...prev, productId: e.target.value }))}
-            options={products.map((p) => ({ value: p.id, label: `${p.name} (${p.stock})` }))}
-            placeholder="Selecione um produto"
-            required
-          />
+          <div ref={productDropdownRef} className="relative">
+            <Input
+              label="Produto"
+              value={productSearch}
+              onChange={(e) => {
+                const value = e.target.value;
+                setProductSearch(value);
+                setProductDropdownOpen(true);
+                if (!value || form.productId) setForm((prev) => ({ ...prev, productId: "" }));
+              }}
+              onFocus={() => setProductDropdownOpen(true)}
+              placeholder="Digite para buscar o produto..."
+              autoComplete="off"
+            />
+            {productDropdownOpen && (
+              <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                {filteredProducts.length === 0 ? (
+                  <li className="px-3 py-2 text-sm text-gray-500">Nenhum produto encontrado</li>
+                ) : (
+                  <>
+                    {filteredProducts.slice(0, 200).map((p) => (
+                      <li
+                        key={p.id}
+                        className="cursor-pointer px-3 py-2 text-sm text-gray-800 hover:bg-gray-100"
+                        onClick={() => {
+                          setForm((prev) => ({ ...prev, productId: p.id }));
+                          setProductSearch(p.name);
+                          setProductDropdownOpen(false);
+                        }}
+                      >
+                        {p.name} <span className="text-gray-500">(estoque: {p.stock})</span>
+                      </li>
+                    ))}
+                    {filteredProducts.length > 200 && (
+                      <li className="border-t border-gray-100 px-3 py-2 text-xs text-gray-500">
+                        Mostrando 200 de {filteredProducts.length}. Digite para filtrar.
+                      </li>
+                    )}
+                  </>
+                )}
+              </ul>
+            )}
+            {selectedProduct && (
+              <p className="mt-1 text-xs text-gray-500">
+                Selecionado: {selectedProduct.name} (estoque atual: {selectedProduct.stock})
+              </p>
+            )}
+          </div>
 
           <Select
             label="Tipo"
