@@ -92,6 +92,7 @@ export default function ReceivablesPage({ params }: { params: Promise<{ storeId:
     OPEN: { label: "Em Aberto", variant: "danger" as const },
     PARTIAL: { label: "Parcial", variant: "warning" as const },
     PAID: { label: "Pago", variant: "success" as const },
+    CANCELLED: { label: "Cancelado", variant: "default" as const },
   };
 
   return (
@@ -102,7 +103,7 @@ export default function ReceivablesPage({ params }: { params: Promise<{ storeId:
 
       {/* Filters */}
       <div className="mb-4 flex gap-2">
-        {["", "OPEN", "PARTIAL", "PAID"].map((status) => (
+        {["", "OPEN", "PARTIAL", "PAID", "CANCELLED"].map((status) => (
           <Button
             key={status}
             variant={statusFilter === status ? "primary" : "ghost"}
