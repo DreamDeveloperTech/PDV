@@ -210,14 +210,11 @@ export default function ReceivablesPage({ params }: { params: Promise<{ storeId:
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Descrição</TableHead>
+                    <TableHead>Data / descrição</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
-                    <TableHead className="text-right">Pago</TableHead>
                     <TableHead className="text-right">Saldo</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="w-[70px]">Venda</TableHead>
-                    <TableHead className="w-[80px]">Ações</TableHead>
+                    <TableHead className="w-[120px]">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -225,46 +222,51 @@ export default function ReceivablesPage({ params }: { params: Promise<{ storeId:
                     const remaining = receivable.amount - receivable.paidAmount;
                     return (
                       <TableRow key={receivable.id}>
-                        <TableCell className="whitespace-nowrap text-sm">
-                          {formatDateTime(receivable.createdAt)}
+                        <TableCell className="text-sm">
+                          <div className="text-gray-700">
+                            {formatDateTime(receivable.createdAt)}
+                          </div>
+                          <div className="text-xs text-gray-500 truncate max-w-[260px]">
+                            {receivable.description || "Sem descrição"}
+                          </div>
                         </TableCell>
-                        <TableCell className="text-sm">{receivable.description || "—"}</TableCell>
-                        <TableCell className="text-right text-sm">{formatCurrency(receivable.amount)}</TableCell>
-                        <TableCell className="text-right text-sm">{formatCurrency(receivable.paidAmount)}</TableCell>
-                        <TableCell className="text-right text-sm font-medium">{formatCurrency(remaining)}</TableCell>
+                        <TableCell className="text-right text-sm">
+                          {formatCurrency(receivable.amount)}
+                        </TableCell>
+                        <TableCell className="text-right text-sm font-medium">
+                          {formatCurrency(remaining)}
+                        </TableCell>
                         <TableCell>
                           <Badge variant={statusConfig[receivable.status].variant}>
                             {statusConfig[receivable.status].label}
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          {receivable.sale ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setSaleDetailReceivable(receivable)}
-                              title="Ver itens e vendedor"
-                            >
-                              <Eye size={12} />
-                            </Button>
-                          ) : (
-                            <span className="text-gray-400">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {receivable.status !== "PAID" && receivable.status !== "CANCELLED" && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setPaymentModal(receivable);
-                                setPaymentAmount(String(remaining));
-                              }}
-                            >
-                              <DollarSign size={12} className="mr-0.5" />
-                              Receber
-                            </Button>
-                          )}
+                          <div className="flex items-center justify-end gap-2">
+                            {receivable.sale && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setSaleDetailReceivable(receivable)}
+                                title="Ver itens e vendedor"
+                              >
+                                <Eye size={12} />
+                              </Button>
+                            )}
+                            {receivable.status !== "PAID" && receivable.status !== "CANCELLED" && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setPaymentModal(receivable);
+                                  setPaymentAmount(String(remaining));
+                                }}
+                              >
+                                <DollarSign size={12} className="mr-0.5" />
+                                Receber
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
