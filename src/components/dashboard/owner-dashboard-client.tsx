@@ -15,6 +15,14 @@ interface OwnerDashboardClientProps {
   initialData: OwnerDashboardData;
 }
 
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  CASH: "Dinheiro",
+  CREDIT: "Crédito",
+  DEBIT: "Débito",
+  PIX: "PIX",
+  FIADO: "Fiado",
+};
+
 function formatDateInput(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
@@ -147,6 +155,34 @@ export function OwnerDashboardClient({ storeId, initialData }: OwnerDashboardCli
           icon={<DollarSign size={20} />}
           trend={data.totalOutstanding > 0 ? "down" : "neutral"}
         />
+      </div>
+
+      {/* Payment methods summary */}
+      <div className="mt-6">
+        <Card
+          title="Receita por forma de pagamento"
+          description="Valores recebidos por meio de pagamento no período selecionado"
+        >
+          {data.paymentMethodsSummary.length === 0 ? (
+            <p className="text-sm text-gray-500">Nenhuma venda no período selecionado.</p>
+          ) : (
+            <ul className="space-y-2">
+              {data.paymentMethodsSummary.map((item) => (
+                <li
+                  key={item.method}
+                  className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2"
+                >
+                  <span className="text-sm text-gray-700">
+                    {PAYMENT_METHOD_LABELS[item.method] || item.method}
+                  </span>
+                  <span className="text-sm font-semibold text-gray-900">
+                    {formatCurrency(item.amount)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">

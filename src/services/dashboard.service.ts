@@ -22,6 +22,7 @@ export interface OwnerDashboardData {
   totalOutstanding: number;
   defaulters: { id: string; name: string }[];
   totalSales: number;
+  paymentMethodsSummary: { method: string; amount: number }[];
 }
 
 export interface EmployeeDashboardData {
@@ -64,6 +65,7 @@ export const dashboardService = {
       totalOutstanding,
       defaulters,
       totalSales,
+      paymentMethodsSummary,
     ] = await Promise.all([
       saleRepository.sumRevenueByStore(storeId),
       saleRepository.sumRevenueByStore(storeId, effectiveFrom, effectiveTo),
@@ -72,6 +74,7 @@ export const dashboardService = {
       receivableRepository.sumOutstandingByStore(storeId),
       customerRepository.findDefaulters(storeId),
       saleRepository.countByStoreId(storeId),
+      saleRepository.sumPaymentsByMethod(storeId, effectiveFrom, effectiveTo),
     ]);
 
     return {
@@ -87,6 +90,10 @@ export const dashboardService = {
       totalOutstanding,
       defaulters: defaulters.map((d) => ({ id: d.id, name: d.name })),
       totalSales,
+      paymentMethodsSummary: paymentMethodsSummary.map((p) => ({
+        method: p.method,
+        amount: p.amount,
+      })),
     };
   },
 

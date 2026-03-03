@@ -2,7 +2,13 @@
  * Repository for Sale data access.
  */
 import { prisma } from "@/lib/prisma";
-import type { Sale, SaleItem, SalePayment, PaymentMethod } from "@/generated/prisma/client";
+import type {
+  Sale,
+  SaleItem,
+  SalePayment,
+  PaymentMethod,
+  Prisma,
+} from "@/generated/prisma/client";
 
 interface CreateSaleData {
   storeId: string;
@@ -219,5 +225,38 @@ export const saleRepository = {
     ]);
 
     return { data, total };
+  },
+
+  /** Sum paid amount by payment method for a store and optional date range (excludes cancelled sales). */
+  async sumPaymentsByMethod(
+    storeId: string,
+    startDate?: Date,
+    endDate?: Date
+  ): Promise<{ method: PaymentMethod; amount: number }[]> {
+    const where: Prisma.SalePaymentWhereInput = {
+      sale: {
+        storeId,
+        cancelledAt: null,
+        ...(startDate || endDate
+          ? {
+              createdAt: {
+                ...(startDate ? { gte: startDate } : {}),
+                ...(endDate ? { lte: endDate } : {}),
+              },
+            }
+          : {}),
+      },
+    };
+
+    const rows = await prisma.salePayment.groupBy({
+      by: ["method"],
+      where,
+      _sum: { amount: true },
+    });
+
+    return rows.map((row) => ({
+      method: row.method,
+      amount: row._sum.amount ?? 0,
+    }));
   },
 };
