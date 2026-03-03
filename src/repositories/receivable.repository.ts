@@ -81,8 +81,8 @@ export const receivableRepository = {
     return prisma.accountReceivable.create({ data });
   },
 
-  async findBySaleId(saleId: string): Promise<AccountReceivable | null> {
-    return prisma.accountReceivable.findUnique({
+  async findBySaleId(saleId: string): Promise<AccountReceivable[]> {
+    return prisma.accountReceivable.findMany({
       where: { saleId },
     });
   },

@@ -88,13 +88,34 @@ export const saleService = {
       );
     }
 
-    // 5. If FIADO, validate customer credit
-    const fiadoPayment = input.payments.find((p) => p.method === "FIADO");
-    if (fiadoPayment) {
-      if (!input.customerId) {
-        throw new BusinessRuleError("Venda fiado requer um cliente vinculado");
+    // 5. If FIADO, validate customer credit (single or multi-client)
+    const fiadoTotal = input.payments
+      .filter((p) => p.method === "FIADO")
+      .reduce((sum, p) => sum + p.amount, 0);
+    const hasFiado = fiadoTotal > 0.01;
+
+    if (hasFiado) {
+      const splits = input.fiadoSplits ?? [];
+      const validSplits = splits.filter((s) => s.amount > 0);
+
+      if (validSplits.length > 0) {
+        const splitTotal = validSplits.reduce((sum, s) => sum + s.amount, 0);
+        if (Math.abs(splitTotal - fiadoTotal) > 0.01) {
+          throw new ValidationError(
+            `Soma dos fiados por cliente (R$ ${splitTotal.toFixed(
+              2
+            )}) não confere com o total em FIADO (R$ ${fiadoTotal.toFixed(2)})`
+          );
+        }
+        for (const split of validSplits) {
+          await receivableService.validateCreditForSale(split.customerId, split.amount);
+        }
+      } else {
+        if (!input.customerId) {
+          throw new BusinessRuleError("Venda fiado requer um cliente vinculado");
+        }
+        await receivableService.validateCreditForSale(input.customerId, fiadoTotal);
       }
-      await receivableService.validateCreditForSale(input.customerId, fiadoPayment.amount);
     }
 
     // 6. Execute everything in a transaction
@@ -121,17 +142,30 @@ export const saleService = {
         await productService.deductStockForSale(storeId, item.productId, item.quantity, reason);
       }
 
-      // Create receivable if FIADO
-      if (fiadoPayment && input.customerId) {
-        await receivableService.createFromSale(
-          storeId,
-          input.customerId,
-          createdSale.id,
-          fiadoPayment.amount
-        );
+      // Create receivable(s) if FIADO
+      if (hasFiado) {
+        const splits = input.fiadoSplits ?? [];
+        const validSplits = splits.filter((s) => s.amount > 0);
 
-        // Check if customer should be blocked after this sale
-        await receivableService.checkAndUpdateCreditBlock(input.customerId);
+        if (validSplits.length > 0) {
+          for (const split of validSplits) {
+            await receivableService.createFromSale(
+              storeId,
+              split.customerId,
+              createdSale.id,
+              split.amount
+            );
+            await receivableService.checkAndUpdateCreditBlock(split.customerId);
+          }
+        } else if (input.customerId) {
+          await receivableService.createFromSale(
+            storeId,
+            input.customerId,
+            createdSale.id,
+            fiadoTotal
+          );
+          await receivableService.checkAndUpdateCreditBlock(input.customerId);
+        }
       }
 
       return createdSale;

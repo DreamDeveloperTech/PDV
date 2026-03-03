@@ -140,8 +140,8 @@ export const receivableService = {
    * Cancel a receivable linked to a sale (e.g. when sale is cancelled).
    */
   async cancelBySaleId(saleId: string): Promise<void> {
-    const receivable = await receivableRepository.findBySaleId(saleId);
-    if (receivable) {
+    const receivables = await receivableRepository.findBySaleId(saleId);
+    for (const receivable of receivables) {
       await receivableRepository.setStatus(receivable.id, "CANCELLED");
       await this.checkAndUpdateCreditBlock(receivable.customerId);
     }

@@ -196,7 +196,7 @@ model AccountReceivable {
   id          String           @id @default(cuid())
   storeId     String
   customerId  String
-  saleId      String?          @unique
+  saleId      String?
   amount      Float
   paidAmount  Float            @default(0)
   status      ReceivableStatus @default(OPEN)
@@ -207,13 +207,14 @@ model AccountReceivable {
 
   store    Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
   customer Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  sale     Sale?               @relation(fields: [saleId], references: [id])
+  sale     Sale?               @relation("SaleReceivables", fields: [saleId], references: [id])
   payments ReceivablePayment[]
 
   @@index([storeId])
   @@index([customerId])
   @@index([storeId, status])
   @@index([storeId, customerId])
+  @@index([saleId])
 }
 
 model ReceivablePayment {
@@ -295,12 +296,12 @@ model Sale {
   cancelledAt   DateTime?
   cancelledBy   String?
 
-  store       Store              @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  cashSession CashSession        @relation(fields: [cashSessionId], references: [id])
-  customer    Customer?          @relation(fields: [customerId], references: [id])
+  store       Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  cashSession CashSession         @relation(fields: [cashSessionId], references: [id])
+  customer    Customer?           @relation(fields: [customerId], references: [id])
   items       SaleItem[]
   payments    SalePayment[]
-  receivable  AccountReceivable?
+  receivables AccountReceivable[] @relation("SaleReceivables")
 
   @@index([storeId])
   @@index([cashSessionId])

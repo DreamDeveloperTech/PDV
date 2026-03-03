@@ -86,6 +86,12 @@ interface PaymentEntry {
   amount: number;
 }
 
+interface FiadoSplitRow {
+  id: string;
+  customerId: string;
+  amount: string;
+}
+
 const PAYMENT_METHODS = [
   { value: "CASH", label: "Dinheiro", icon: <Banknote size={16} /> },
   { value: "CREDIT", label: "Crédito", icon: <CreditCard size={16} /> },
@@ -110,6 +116,7 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
   const [currentPaymentAmount, setCurrentPaymentAmount] = useState("");
   const [changeAmount, setChangeAmount] = useState(0);
   const [splitPeople, setSplitPeople] = useState("");
+  const [fiadoSplits, setFiadoSplits] = useState<FiadoSplitRow[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [sellAtCost, setSellAtCost] = useState(false);
 
@@ -218,6 +225,13 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
   const remaining = total - paymentTotal;
   const splitCount = Number(splitPeople) > 0 ? Number(splitPeople) : 0;
   const splitPerPerson = splitCount > 0 && total > 0 ? remaining / splitCount : 0;
+  const fiadoPaymentsTotal = payments
+    .filter((p) => p.method === "FIADO")
+    .reduce((sum, p) => sum + p.amount, 0);
+  const fiadoSplitsTotal = fiadoSplits.reduce(
+    (sum, row) => sum + (Number(row.amount) || 0),
+    0
+  );
 
   function getAvailableStock(product: Product) {
     return product.effectiveStock ?? product.stock;
@@ -331,6 +345,38 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
     setPayments((prev) => prev.filter((_, i) => i !== index));
   }
 
+  function addFiadoSplit() {
+    setFiadoSplits((prev) => [
+      ...prev,
+      {
+        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        customerId: "",
+        amount: "",
+      },
+    ]);
+  }
+
+  function updateFiadoSplit(
+    id: string,
+    field: "customerId" | "amount",
+    value: string
+  ) {
+    setFiadoSplits((prev) =>
+      prev.map((row) =>
+        row.id === id
+          ? {
+              ...row,
+              [field]: value,
+            }
+          : row
+      )
+    );
+  }
+
+  function removeFiadoSplit(id: string) {
+    setFiadoSplits((prev) => prev.filter((row) => row.id !== id));
+  }
+
   async function handleOpenSession() {
     try {
       const result = await apiRequest<CashSession>(`/api/cash-sessions?storeId=${storeId}`, {
@@ -396,10 +442,32 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
       return;
     }
 
-    const hasFiado = payments.some((p) => p.method === "FIADO");
-    if (hasFiado && !selectedCustomer) {
-      setError("Para pagamentos FIADO, selecione um cliente antes de finalizar a venda.");
-      return;
+    const hasFiado = fiadoPaymentsTotal > 0.01;
+    const validFiadoSplits = fiadoSplits.filter(
+      (row) => row.customerId && Number(row.amount) > 0
+    );
+    const hasFiadoSplits = validFiadoSplits.length > 0;
+
+    if (hasFiado) {
+      if (hasFiadoSplits) {
+        const splitTotal = validFiadoSplits.reduce(
+          (sum, row) => sum + Number(row.amount),
+          0
+        );
+        if (Math.abs(splitTotal - fiadoPaymentsTotal) > 0.01) {
+          setError(
+            "Soma dos fiados por cliente não confere com o total em FIADO."
+          );
+          return;
+        }
+      } else {
+        if (!selectedCustomer) {
+          setError(
+            "Para pagamentos FIADO, selecione um cliente ou defina os clientes em \"Fiado por cliente\"."
+          );
+          return;
+        }
+      }
     }
 
     setSaleLoading(true);
@@ -417,6 +485,14 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
           })),
           payments,
           discount,
+          ...(hasFiado && hasFiadoSplits
+            ? {
+                fiadoSplits: validFiadoSplits.map((row) => ({
+                  customerId: row.customerId,
+                  amount: Number(row.amount),
+                })),
+              }
+            : {}),
         },
       });
 
@@ -707,7 +783,7 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
             </Button>
           </div>
 
-          {/* Split helper */}
+          {/* Split helper (somente calculadora) */}
           <div className="mt-3 flex flex-col gap-1 text-xs text-gray-600">
             <div className="flex items-center gap-2">
               <Input
@@ -733,6 +809,79 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
                 )}
               </div>
             </div>
+          </div>
+
+          {/* Fiado por cliente */}
+          <div className="mt-4 border-t border-gray-200 pt-3">
+            <p className="text-sm font-medium text-gray-700 mb-1">
+              Fiado por cliente (opcional)
+            </p>
+            <p className="text-xs text-gray-500 mb-2">
+              Use esta seção se quiser dividir o FIADO entre várias pessoas. Cada linha
+              gera um título separado em Contas a Receber.
+            </p>
+
+            {fiadoSplits.map((row) => (
+              <div key={row.id} className="mb-2 flex items-center gap-2">
+                <Select
+                  value={row.customerId}
+                  onChange={(e) =>
+                    updateFiadoSplit(row.id, "customerId", e.target.value)
+                  }
+                  options={customers.map((c) => ({ value: c.id, label: c.name }))}
+                  placeholder="Cliente"
+                  className="flex-1"
+                />
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  placeholder="Valor fiado"
+                  value={row.amount}
+                  onChange={(e) =>
+                    updateFiadoSplit(row.id, "amount", e.target.value)
+                  }
+                  className="w-28"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeFiadoSplit(row.id)}
+                  className="text-red-500 hover:text-red-700"
+                  title="Remover"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={addFiadoSplit}
+              className="mt-1 text-xs"
+            >
+              + Adicionar cliente fiado
+            </Button>
+
+            {fiadoPaymentsTotal > 0 && (
+              <p className="mt-2 text-xs">
+                Total em FIADO:{" "}
+                <span className="font-semibold">
+                  {formatCurrency(fiadoPaymentsTotal)}
+                </span>{" "}
+                — soma por cliente:{" "}
+                <span
+                  className={
+                    Math.abs(fiadoSplitsTotal - fiadoPaymentsTotal) > 0.01
+                      ? "font-semibold text-red-600"
+                      : "font-semibold text-green-700"
+                  }
+                >
+                  {formatCurrency(fiadoSplitsTotal)}
+                </span>
+              </p>
+            )}
           </div>
 
           {remaining > 0.01 && (

@@ -15,12 +15,18 @@ export const salePaymentSchema = z.object({
   amount: z.number().min(0.01, "Valor deve ser maior que zero"),
 });
 
+export const fiadoSplitSchema = z.object({
+  customerId: z.string().min(1, "Cliente é obrigatório"),
+  amount: z.number().min(0.01, "Valor deve ser maior que zero"),
+});
+
 export const createSaleSchema = z.object({
   cashSessionId: z.string().min(1, "Sessão de caixa é obrigatória"),
   customerId: z.string().optional(),
   items: z.array(saleItemSchema).min(1, "A venda deve ter pelo menos um item"),
   payments: z.array(salePaymentSchema).min(1, "A venda deve ter pelo menos um pagamento"),
   discount: z.number().min(0).default(0),
+  fiadoSplits: z.array(fiadoSplitSchema).optional(),
 });
 
 export const openCashSessionSchema = z.object({
@@ -50,6 +56,7 @@ export const cancelSaleSchema = z.object({
 
 export type SaleItemInput = z.infer<typeof saleItemSchema>;
 export type SalePaymentInput = z.infer<typeof salePaymentSchema>;
+export type FiadoSplitInput = z.infer<typeof fiadoSplitSchema>;
 export type CreateSaleInput = z.infer<typeof createSaleSchema>;
 export type OpenCashSessionInput = z.infer<typeof openCashSessionSchema>;
 export type CloseCashSessionInput = z.infer<typeof closeCashSessionSchema>;
