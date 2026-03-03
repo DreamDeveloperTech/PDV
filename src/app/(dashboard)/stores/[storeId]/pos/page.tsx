@@ -69,7 +69,7 @@ interface CashSession {
   isExpiredForSales?: boolean;
   /** true = esta sessão já estava aberta (valor compartilhado com todos) */
   alreadyOpen?: boolean;
-  /** apenas MASTER/OWNER podem fechar; funcionário não vê o botão */
+  /** MASTER/OWNER/EMPLOYEE podem fechar pelo PDV; página de histórico só MASTER/OWNER */
   canCloseSession?: boolean;
 }
 

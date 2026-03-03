@@ -25,7 +25,8 @@ export async function GET(request: NextRequest) {
 
     if (action === "current") {
       const session = await cashSessionService.getOpenSession(storeId);
-      const canCloseSession = ["MASTER", "OWNER"].includes(context.role);
+      // Funcionário pode fechar o caixa (botão no PDV), mas não acessa a página de histórico.
+      const canCloseSession = ["MASTER", "OWNER", "EMPLOYEE"].includes(context.role);
       const data = session
         ? {
             ...session,
@@ -95,7 +96,8 @@ export async function PATCH(request: NextRequest) {
     }
 
     const context = await authService.getStoreUserContext(storeId);
-    authService.requireRole(context, ["MASTER", "OWNER"]);
+    // Dono/gerente e funcionário podem fechar; histórico de fechamentos só MASTER/OWNER (GET sem action).
+    authService.requireRole(context, ["MASTER", "OWNER", "EMPLOYEE"]);
 
     const body = await request.json();
     const input = closeCashSessionSchema.parse(body);

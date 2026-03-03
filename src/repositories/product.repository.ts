@@ -124,16 +124,23 @@ export const productRepository = {
     };
   },
 
-  /** Find products with stock at or below their minimum stock level */
+  /**
+   * Find products with stock at or below minStock.
+   * Excludes: derivados (have baseProductId), bases (have derivedProducts), kits (have ingredients).
+   * Includes: produtos simples e ingredientes (ex.: os 3 ingredientes de "dose") — estes devem aparecer.
+   */
   async findLowStock(storeId: string): Promise<Product[]> {
-    return prisma.product.findMany({
+    const products = await prisma.product.findMany({
       where: {
         storeId,
         isActive: true,
-        stock: { lte: prisma.product.fields.minStock },
+        baseProductId: null,
+        derivedProducts: { none: {} },
+        ingredients: { none: {} },
       },
       orderBy: { stock: "asc" },
     });
+    return products.filter((p) => p.stock <= p.minStock);
   },
 
   async countByStoreId(storeId: string): Promise<number> {
