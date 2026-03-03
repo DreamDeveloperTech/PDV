@@ -262,7 +262,6 @@ export default function ReceivablesPage({ params }: { params: Promise<{ storeId:
                 <TableHeader>
                   <TableRow>
                     <TableHead>Data / descrição</TableHead>
-                    <TableHead className="text-right">Valor</TableHead>
                     <TableHead className="text-right">Saldo</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="w-[120px]">Ações</TableHead>
@@ -280,9 +279,6 @@ export default function ReceivablesPage({ params }: { params: Promise<{ storeId:
                           <div className="text-xs text-gray-500 truncate max-w-[260px]">
                             {receivable.description || "Sem descrição"}
                           </div>
-                        </TableCell>
-                        <TableCell className="text-right text-sm">
-                          {formatCurrency(receivable.amount)}
                         </TableCell>
                         <TableCell className="text-right text-sm font-medium">
                           {formatCurrency(remaining)}
@@ -403,7 +399,55 @@ export default function ReceivablesPage({ params }: { params: Promise<{ storeId:
               <span className="font-semibold">Total da venda: </span>
               {formatCurrency(saleDetailReceivable.amount)}
             </p>
-            <div className="flex justify-end">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setEditReceivable(saleDetailReceivable);
+                    setEditAmount(String(saleDetailReceivable.amount));
+                    setEditDescription(saleDetailReceivable.description ?? "");
+                    setSaleDetailReceivable(null);
+                  }}
+                  title="Editar título"
+                >
+                  <Pencil size={14} className="mr-1" />
+                  Editar
+                </Button>
+                {saleDetailReceivable.status !== "PAID" &&
+                  saleDetailReceivable.status !== "CANCELLED" && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const remaining =
+                            saleDetailReceivable.amount - saleDetailReceivable.paidAmount;
+                          setPaymentModal(saleDetailReceivable);
+                          setPaymentAmount(String(remaining));
+                          setSaleDetailReceivable(null);
+                        }}
+                        title="Registrar pagamento"
+                      >
+                        <DollarSign size={14} className="mr-1" />
+                        Receber
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setCancelReceivable(saleDetailReceivable);
+                          setSaleDetailReceivable(null);
+                        }}
+                        title="Cancelar título"
+                      >
+                        <XCircle size={14} className="text-red-600 mr-1" />
+                        Cancelar
+                      </Button>
+                    </>
+                  )}
+              </div>
               <Button variant="secondary" onClick={() => setSaleDetailReceivable(null)}>
                 Fechar
               </Button>
