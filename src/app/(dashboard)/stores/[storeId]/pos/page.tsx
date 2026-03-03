@@ -109,6 +109,7 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
   const [currentPaymentMethod, setCurrentPaymentMethod] = useState<string>("CASH");
   const [currentPaymentAmount, setCurrentPaymentAmount] = useState("");
   const [changeAmount, setChangeAmount] = useState(0);
+  const [splitPeople, setSplitPeople] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [sellAtCost, setSellAtCost] = useState(false);
 
@@ -215,6 +216,8 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
   const total = subtotal - discount;
   const paymentTotal = payments.reduce((sum, p) => sum + p.amount, 0);
   const remaining = total - paymentTotal;
+  const splitCount = Number(splitPeople) > 0 ? Number(splitPeople) : 0;
+  const splitPerPerson = splitCount > 0 && total > 0 ? remaining / splitCount : 0;
 
   function getAvailableStock(product: Product) {
     return product.effectiveStock ?? product.stock;
@@ -390,6 +393,12 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
     if (!session || cart.length === 0) return;
     if (Math.abs(remaining) > 0.01) {
       setError("O total dos pagamentos deve ser igual ao total da venda");
+      return;
+    }
+
+    const hasFiado = payments.some((p) => p.method === "FIADO");
+    if (hasFiado && !selectedCustomer) {
+      setError("Para pagamentos FIADO, selecione um cliente antes de finalizar a venda.");
       return;
     }
 
@@ -696,6 +705,34 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
             <Button variant="secondary" size="sm" onClick={addPayment}>
               <Plus size={14} />
             </Button>
+          </div>
+
+          {/* Split helper */}
+          <div className="mt-3 flex flex-col gap-1 text-xs text-gray-600">
+            <div className="flex items-center gap-2">
+              <Input
+                label="Dividir entre quantas pessoas?"
+                type="number"
+                min="2"
+                step="1"
+                value={splitPeople}
+                onChange={(e) => setSplitPeople(e.target.value)}
+                className="w-28"
+              />
+              <div className="flex-1">
+                {splitCount > 0 && remaining > 0.01 ? (
+                  <p>
+                    Cada um deve pagar aproximadamente{" "}
+                    <span className="font-semibold">
+                      {formatCurrency(splitPerPerson)}
+                    </span>{" "}
+                    para fechar a conta.
+                  </p>
+                ) : (
+                  <p>Use este campo para calcular quanto cada pessoa deve pagar.</p>
+                )}
+              </div>
+            </div>
           </div>
 
           {remaining > 0.01 && (
