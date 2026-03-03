@@ -290,6 +290,7 @@ model Sale {
   subtotal      Float
   discount      Float     @default(0)
   total         Float
+  soldByName    String?
   createdAt     DateTime  @default(now())
   cancelledAt   DateTime?
   cancelledBy   String?

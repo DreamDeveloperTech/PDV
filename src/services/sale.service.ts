@@ -107,6 +107,7 @@ export const saleService = {
         subtotal,
         discount: input.discount,
         total,
+        soldByName: sellerName ?? null,
         items: itemsWithProduct,
         payments: input.payments.map((p) => ({
           method: p.method as PaymentMethod,
@@ -152,8 +153,9 @@ export const saleService = {
   },
 
   /**
-   * Cancel a sale: revert stock, exclude from cash (expectedCash), cancel receivable if FIADO.
+   * Cancel a sale: revert stock, cancel receivable if FIADO.
    * Only MASTER/OWNER may cancel; password is verified by the API before calling this.
+   * Allowed at any time (caixa aberto ou fechado) — funcionário não tem acesso ao cancelamento.
    */
   async cancelSale(storeId: string, saleId: string, cancelledByUserId: string) {
     const sale = await saleRepository.findById(saleId);
@@ -165,14 +167,6 @@ export const saleService = {
     }
     if (sale.cancelledAt != null) {
       throw new BusinessRuleError("Esta venda já está cancelada");
-    }
-
-    const session = await cashSessionRepository.findById(sale.cashSessionId);
-    if (!session || session.storeId !== storeId) {
-      throw new NotFoundError("Sessão de caixa");
-    }
-    if (session.status !== "OPEN") {
-      throw new BusinessRuleError("Não é possível cancelar venda de um caixa já fechado");
     }
 
     await prisma.$transaction(async () => {

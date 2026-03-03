@@ -34,7 +34,10 @@ export const receivableRepository = {
     storeId: string,
     options?: { status?: ReceivableStatus; page?: number; pageSize?: number }
   ): Promise<{
-    data: (AccountReceivable & { customer: { name: string } })[];
+    data: (AccountReceivable & {
+      customer: { name: string };
+      sale: { id: string; soldByName: string | null; items: { productName: string; quantity: number; unitPrice: number; total: number }[] } | null;
+    })[];
     total: number;
   }> {
     const page = options?.page ?? 1;
@@ -52,7 +55,10 @@ export const receivableRepository = {
         skip,
         take: pageSize,
         orderBy: { createdAt: "desc" },
-        include: { customer: { select: { name: true } } },
+        include: {
+          customer: { select: { name: true } },
+          sale: { select: { id: true, soldByName: true }, include: { items: true } },
+        },
       }),
       prisma.accountReceivable.count({ where }),
     ]);

@@ -11,6 +11,7 @@ interface CreateSaleData {
   subtotal: number;
   discount: number;
   total: number;
+  soldByName?: string | null;
   items: {
     productId: string;
     productName: string;
@@ -81,6 +82,7 @@ export const saleRepository = {
         subtotal: data.subtotal,
         discount: data.discount,
         total: data.total,
+        soldByName: data.soldByName ?? undefined,
         items: {
           create: data.items,
         },

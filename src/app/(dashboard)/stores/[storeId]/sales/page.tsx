@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 import { apiRequest } from "@/hooks/use-fetch";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { Search, XCircle } from "lucide-react";
+import { Search, XCircle, Eye } from "lucide-react";
 
 interface SaleItem {
   productName: string;
@@ -40,6 +40,7 @@ interface SaleRow {
   id: string;
   total: number;
   discount: number;
+  soldByName: string | null;
   createdAt: string;
   cancelledAt: string | null;
   customer: { id: string; name: string } | null;
@@ -82,6 +83,7 @@ export default function SalesPage({ params }: { params: Promise<{ storeId: strin
 
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [saleToCancel, setSaleToCancel] = useState<SaleRow | null>(null);
+  const [detailModalSale, setDetailModalSale] = useState<SaleRow | null>(null);
   const [cancelPassword, setCancelPassword] = useState("");
   const [cancelLoading, setCancelLoading] = useState(false);
   const [cancelError, setCancelError] = useState("");
@@ -356,6 +358,7 @@ export default function SalesPage({ params }: { params: Promise<{ storeId: strin
                 <TableHead>Pagamento</TableHead>
                 <TableHead className="text-right">Total</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="w-[90px]">Detalhes</TableHead>
                 {canCancelSale && <TableHead className="w-[100px]">Ações</TableHead>}
               </TableRow>
             </TableHeader>
@@ -395,6 +398,17 @@ export default function SalesPage({ params }: { params: Promise<{ storeId: strin
                       ) : (
                         <Badge variant="success">Concluída</Badge>
                       )}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setDetailModalSale(sale)}
+                        title="Ver itens e vendedor"
+                      >
+                        <Eye size={14} className="mr-1" />
+                        Ver
+                      </Button>
                     </TableCell>
                     {canCancelSale && (
                       <TableCell>
@@ -450,6 +464,41 @@ export default function SalesPage({ params }: { params: Promise<{ storeId: strin
           </Button>
         </div>
       )}
+
+      <Modal
+        isOpen={!!detailModalSale}
+        onClose={() => setDetailModalSale(null)}
+        title="Detalhes da venda"
+      >
+        {detailModalSale && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              <strong>Vendido por:</strong> {detailModalSale.soldByName ?? "—"}
+            </p>
+            <div>
+              <p className="text-xs font-medium uppercase text-gray-500 mb-2">Itens</p>
+              <ul className="space-y-1.5 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                {detailModalSale.items.map((item, idx) => (
+                  <li key={idx} className="flex justify-between text-sm">
+                    <span>{item.productName}</span>
+                    <span className="text-gray-600">
+                      {item.quantity}x {formatCurrency(item.unitPrice)} = {formatCurrency(item.total)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <p className="text-sm text-gray-600">
+              <strong>Total:</strong> {formatCurrency(detailModalSale.total)}
+            </p>
+            <div className="flex justify-end">
+              <Button variant="secondary" onClick={() => setDetailModalSale(null)}>
+                Fechar
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       <Modal
         isOpen={cancelModalOpen}
