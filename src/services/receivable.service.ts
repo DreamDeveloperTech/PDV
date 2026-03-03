@@ -5,7 +5,7 @@
 import { receivableRepository, receivablePaymentRepository } from "@/repositories/receivable.repository";
 import { customerRepository } from "@/repositories/customer.repository";
 import { NotFoundError, BusinessRuleError, ValidationError } from "@/lib/errors";
-import type { ReceivablePaymentInput } from "@/schemas/receivable.schema";
+import type { ReceivablePaymentInput, UpdateReceivableInput } from "@/schemas/receivable.schema";
 import type { ReceivableStatus } from "@/generated/prisma/client";
 
 export const receivableService = {
@@ -153,5 +153,56 @@ export const receivableService = {
 
   async getOutstandingGlobal() {
     return receivableRepository.sumOutstandingGlobal();
+  },
+
+  /**
+   * Update or cancel a single receivable (manual maintenance from Fiado screen).
+   * - Permite alterar valor apenas se não houver pagamentos.
+   * - Permite alterar descrição a qualquer momento.
+   * - Permite marcar como CANCELLED.
+   */
+  async updateReceivable(
+    storeId: string,
+    id: string,
+    input: UpdateReceivableInput
+  ) {
+    const receivable = await receivableRepository.findById(id);
+    if (!receivable) {
+      throw new NotFoundError("Conta a receber");
+    }
+    if (receivable.storeId !== storeId) {
+      throw new ValidationError("Conta a receber não pertence a esta loja");
+    }
+
+    const data: Partial<Pick<typeof receivable, "amount" | "description" | "status">> = {};
+
+    if (input.amount != null) {
+      if (receivable.paidAmount > 0) {
+        throw new BusinessRuleError(
+          "Não é possível alterar o valor de um título que já possui pagamentos registrados"
+        );
+      }
+      data.amount = input.amount;
+    }
+
+    if (input.description !== undefined) {
+      data.description = input.description;
+    }
+
+    if (input.status === "CANCELLED") {
+      data.status = "CANCELLED";
+    }
+
+    if (Object.keys(data).length === 0) {
+      return receivable;
+    }
+
+    const updated = await receivableRepository.update(id, data);
+
+    if (input.status === "CANCELLED") {
+      await this.checkAndUpdateCreditBlock(receivable.customerId);
+    }
+
+    return updated;
   },
 };

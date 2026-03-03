@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/table";
 import { apiRequest } from "@/hooks/use-fetch";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
-import { DollarSign, Eye } from "lucide-react";
+import { DollarSign, Eye, Pencil, XCircle } from "lucide-react";
 
 interface SaleItem {
   productName: string;
@@ -60,6 +60,14 @@ export default function ReceivablesPage({ params }: { params: Promise<{ storeId:
   const [error, setError] = useState("");
   const [saleDetailReceivable, setSaleDetailReceivable] = useState<Receivable | null>(null);
   const [customerDetailGroup, setCustomerDetailGroup] = useState<CustomerGroup | null>(null);
+  const [editReceivable, setEditReceivable] = useState<Receivable | null>(null);
+  const [editAmount, setEditAmount] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [cancelReceivable, setCancelReceivable] = useState<Receivable | null>(null);
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [cancelError, setCancelError] = useState("");
 
   const fetchReceivables = useCallback(async () => {
     setLoading(true);
@@ -122,6 +130,49 @@ export default function ReceivablesPage({ params }: { params: Promise<{ storeId:
       setError(err instanceof Error ? err.message : "Erro ao registrar pagamento");
     } finally {
       setPaymentLoading(false);
+    }
+  }
+
+  async function handleEditReceivableSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!editReceivable) return;
+    setEditLoading(true);
+    setEditError("");
+
+    try {
+      await apiRequest(`/api/receivables/${editReceivable.id}?storeId=${storeId}`, {
+        method: "PATCH",
+        body: {
+          amount: Number(editAmount),
+          description: editDescription || undefined,
+        },
+      });
+      setEditReceivable(null);
+      setEditAmount("");
+      setEditDescription("");
+      await fetchReceivables();
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "Erro ao atualizar título de fiado");
+    } finally {
+      setEditLoading(false);
+    }
+  }
+
+  async function handleCancelReceivableConfirm() {
+    if (!cancelReceivable) return;
+    setCancelLoading(true);
+    setCancelError("");
+    try {
+      await apiRequest(`/api/receivables/${cancelReceivable.id}?storeId=${storeId}`, {
+        method: "PATCH",
+        body: { status: "CANCELLED" },
+      });
+      setCancelReceivable(null);
+      await fetchReceivables();
+    } catch (err) {
+      setCancelError(err instanceof Error ? err.message : "Erro ao cancelar título de fiado");
+    } finally {
+      setCancelLoading(false);
     }
   }
 
@@ -253,18 +304,40 @@ export default function ReceivablesPage({ params }: { params: Promise<{ storeId:
                                 <Eye size={12} />
                               </Button>
                             )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditReceivable(receivable);
+                                setEditAmount(String(receivable.amount));
+                                setEditDescription(receivable.description ?? "");
+                              }}
+                              title="Editar título"
+                            >
+                              <Pencil size={12} />
+                            </Button>
                             {receivable.status !== "PAID" && receivable.status !== "CANCELLED" && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  setPaymentModal(receivable);
-                                  setPaymentAmount(String(remaining));
-                                }}
-                              >
-                                <DollarSign size={12} className="mr-0.5" />
-                                Receber
-                              </Button>
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setPaymentModal(receivable);
+                                    setPaymentAmount(String(remaining));
+                                  }}
+                                  title="Registrar pagamento"
+                                >
+                                  <DollarSign size={12} className="mr-0.5" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setCancelReceivable(receivable)}
+                                  title="Cancelar título"
+                                >
+                                  <XCircle size={12} className="text-red-600" />
+                                </Button>
+                              </>
                             )}
                           </div>
                         </TableCell>
@@ -333,6 +406,110 @@ export default function ReceivablesPage({ params }: { params: Promise<{ storeId:
             <div className="flex justify-end">
               <Button variant="secondary" onClick={() => setSaleDetailReceivable(null)}>
                 Fechar
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Edit receivable modal */}
+      <Modal
+        isOpen={!!editReceivable}
+        onClose={() => {
+          setEditReceivable(null);
+          setEditError("");
+        }}
+        title="Editar título de fiado"
+      >
+        {editReceivable && (
+          <form onSubmit={handleEditReceivableSubmit} className="space-y-4">
+            {editError && (
+              <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{editError}</div>
+            )}
+            <div className="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
+              <p>
+                <strong>Cliente:</strong> {editReceivable.customer.name}
+              </p>
+              <p>
+                <strong>Data:</strong> {formatDateTime(editReceivable.createdAt)}
+              </p>
+            </div>
+            <Input
+              label="Valor do título (R$)"
+              type="number"
+              step="0.01"
+              min="0.01"
+              value={editAmount}
+              onChange={(e) => setEditAmount(e.target.value)}
+              required
+            />
+            <Input
+              label="Descrição"
+              value={editDescription}
+              onChange={(e) => setEditDescription(e.target.value)}
+              placeholder="Opcional"
+            />
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  setEditReceivable(null);
+                  setEditError("");
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" loading={editLoading}>
+                Salvar alterações
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* Cancel receivable confirm modal */}
+      <Modal
+        isOpen={!!cancelReceivable}
+        onClose={() => {
+          setCancelReceivable(null);
+          setCancelError("");
+        }}
+        title="Cancelar título de fiado"
+      >
+        {cancelReceivable && (
+          <div className="space-y-4 text-sm text-gray-700">
+            {cancelError && (
+              <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{cancelError}</div>
+            )}
+            <p>
+              Tem certeza que deseja cancelar este título de fiado do cliente{" "}
+              <strong>{cancelReceivable.customer.name}</strong>?
+            </p>
+            <p>
+              <strong>Valor:</strong> {formatCurrency(cancelReceivable.amount)}{" "}
+              <span className="text-xs text-gray-500">
+                (não registra pagamento, apenas remove do saldo em aberto)
+              </span>
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={() => {
+                  setCancelReceivable(null);
+                  setCancelError("");
+                }}
+              >
+                Fechar
+              </Button>
+              <Button
+                variant="danger"
+                type="button"
+                onClick={handleCancelReceivableConfirm}
+                loading={cancelLoading}
+              >
+                Confirmar cancelamento
               </Button>
             </div>
           </div>

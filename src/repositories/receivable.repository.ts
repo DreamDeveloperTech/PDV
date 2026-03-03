@@ -105,6 +105,16 @@ export const receivableRepository = {
     });
   },
 
+  async update(
+    id: string,
+    data: Partial<Pick<AccountReceivable, "amount" | "description" | "status">>
+  ): Promise<AccountReceivable> {
+    return prisma.accountReceivable.update({
+      where: { id },
+      data,
+    });
+  },
+
   /** Sum of all open/partial receivables for a customer */
   async sumOutstandingByCustomer(customerId: string): Promise<number> {
     const result = await prisma.accountReceivable.aggregate({
