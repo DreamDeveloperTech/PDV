@@ -472,24 +472,42 @@ export default function SalesPage({ params }: { params: Promise<{ storeId: strin
       >
         {detailModalSale && (
           <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              <strong>Vendido por:</strong> {detailModalSale.soldByName ?? "—"}
-            </p>
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600">
+              <p>
+                <strong>Vendido por:</strong> {detailModalSale.soldByName ?? "—"}
+              </p>
+              <p>
+                <strong>Data:</strong> {formatDateTime(detailModalSale.createdAt)}
+              </p>
+            </div>
+
             <div>
               <p className="text-xs font-medium uppercase text-gray-500 mb-2">Itens</p>
-              <ul className="space-y-1.5 rounded-lg border border-gray-200 bg-gray-50 p-3">
-                {detailModalSale.items.map((item, idx) => (
-                  <li key={idx} className="flex justify-between text-sm">
-                    <span>{item.productName}</span>
-                    <span className="text-gray-600">
-                      {item.quantity}x {formatCurrency(item.unitPrice)} = {formatCurrency(item.total)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <div className="rounded-lg border border-gray-200 bg-gray-50 overflow-hidden">
+                <div className="grid grid-cols-4 gap-2 border-b border-gray-200 px-3 py-2 text-xs font-semibold uppercase text-gray-500">
+                  <span className="col-span-2">Produto</span>
+                  <span className="text-right">Qtd x Unit.</span>
+                  <span className="text-right">Total</span>
+                </div>
+                <ul className="divide-y divide-gray-200">
+                  {detailModalSale.items.map((item, idx) => (
+                    <li key={idx} className="grid grid-cols-4 gap-2 px-3 py-2 text-sm">
+                      <span className="col-span-2 text-gray-800">{item.productName}</span>
+                      <span className="text-right text-gray-600">
+                        {item.quantity}x {formatCurrency(item.unitPrice)}
+                      </span>
+                      <span className="text-right font-medium text-gray-800">
+                        {formatCurrency(item.total)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
-            <p className="text-sm text-gray-600">
-              <strong>Total:</strong> {formatCurrency(detailModalSale.total)}
+
+            <p className="text-sm text-gray-900 text-right">
+              <span className="font-semibold">Total da venda: </span>
+              {formatCurrency(detailModalSale.total)}
             </p>
             <div className="flex justify-end">
               <Button variant="secondary" onClick={() => setDetailModalSale(null)}>
