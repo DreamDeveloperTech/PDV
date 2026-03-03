@@ -359,7 +359,6 @@ export default function SalesPage({ params }: { params: Promise<{ storeId: strin
                 <TableHead className="text-right">Total</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="w-[90px]">Detalhes</TableHead>
-                {canCancelSale && <TableHead className="w-[100px]">Ações</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -410,21 +409,6 @@ export default function SalesPage({ params }: { params: Promise<{ storeId: strin
                         Ver
                       </Button>
                     </TableCell>
-                    {canCancelSale && (
-                      <TableCell>
-                        {!sale.cancelledAt && (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => openCancelModal(sale)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <XCircle size={14} className="mr-1" />
-                            Cancelar
-                          </Button>
-                        )}
-                      </TableCell>
-                    )}
                   </TableRow>
                 ))
               )}
@@ -509,7 +493,21 @@ export default function SalesPage({ params }: { params: Promise<{ storeId: strin
               <span className="font-semibold">Total da venda: </span>
               {formatCurrency(detailModalSale.total)}
             </p>
-            <div className="flex justify-end">
+            <div className="flex items-center justify-between gap-3">
+              {canCancelSale && !detailModalSale.cancelledAt && (
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => {
+                    setDetailModalSale(null);
+                    openCancelModal(detailModalSale);
+                  }}
+                  className="flex items-center gap-1"
+                >
+                  <XCircle size={14} />
+                  Cancelar venda
+                </Button>
+              )}
               <Button variant="secondary" onClick={() => setDetailModalSale(null)}>
                 Fechar
               </Button>

@@ -57,7 +57,7 @@ export const receivableRepository = {
         orderBy: { createdAt: "desc" },
         include: {
           customer: { select: { name: true } },
-          sale: { select: { id: true, soldByName: true }, include: { items: true } },
+          sale: { select: { id: true, soldByName: true, items: true } },
         },
       }),
       prisma.accountReceivable.count({ where }),
