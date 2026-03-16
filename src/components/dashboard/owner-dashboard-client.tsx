@@ -83,7 +83,7 @@ export function OwnerDashboardClient({ storeId, initialData }: OwnerDashboardCli
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       {/* Header + filtros */}
-      <div className="flex flex-col gap-4 rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-4 rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
         <div className="space-y-1">
           <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">
             Visão geral da loja
@@ -96,7 +96,8 @@ export function OwnerDashboardClient({ storeId, initialData }: OwnerDashboardCli
           </p>
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        {/* Filtros de data e ações sempre abaixo do texto, em linha apenas entre si */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div className="flex gap-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">
@@ -173,41 +174,43 @@ export function OwnerDashboardClient({ storeId, initialData }: OwnerDashboardCli
         />
       </div>
 
-      {/* Receita por forma de pagamento */}
-      <Card
-        title="Receita por forma de pagamento"
-        description="Valores recebidos por meio de pagamento no período selecionado."
-        className="mt-2"
-      >
-        {data.paymentMethodsSummary.length === 0 ? (
-          <p className="text-sm text-gray-500">
-            Nenhuma venda no período selecionado.
-          </p>
-        ) : (
-          <div className="overflow-hidden rounded-lg border border-gray-200">
-            <div className="grid grid-cols-[1fr_auto] bg-gray-50 px-3 py-1.5 text-xs font-medium uppercase tracking-wide text-gray-500">
-              <span>Forma de pagamento</span>
-              <span className="text-right">Receita</span>
-            </div>
-            <ul className="divide-y divide-gray-100 bg-white">
-              {data.paymentMethodsSummary.map((item) => (
-                <li
-                  key={item.method}
-                  className="grid grid-cols-[1fr_auto] items-center px-3 py-1.5 text-sm"
-                >
-                  <span className="text-gray-700">
-                    {PAYMENT_METHOD_LABELS[item.method] || item.method}
-                  </span>
-                  <span className="text-right font-semibold text-gray-900">
-                    {formatCurrency(item.amount)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </Card>
+      <div className="grid gap-6 lg:grid-cols-2">
 
+        {/* Receita por forma de pagamento */}
+        <Card
+          title="Receita por forma de pagamento"
+          description="Valores recebidos por meio de pagamento no período selecionado."
+          className="mt-2"
+        >
+          {data.paymentMethodsSummary.length === 0 ? (
+            <p className="text-sm text-gray-500">
+              Nenhuma venda no período selecionado.
+            </p>
+          ) : (
+            <div className="overflow-hidden rounded-lg border border-gray-200">
+              <div className="grid grid-cols-[1fr_auto] bg-gray-50 px-3 py-1.5 text-xs font-medium uppercase tracking-wide text-gray-500">
+                <span>Forma de pagamento</span>
+                <span className="text-right">Receita</span>
+              </div>
+              <ul className="divide-y divide-gray-100 bg-white">
+                {data.paymentMethodsSummary.map((item) => (
+                  <li
+                    key={item.method}
+                    className="grid grid-cols-[1fr_auto] items-center px-3 py-1.5 text-sm"
+                  >
+                    <span className="text-gray-700">
+                      {PAYMENT_METHOD_LABELS[item.method] || item.method}
+                    </span>
+                    <span className="text-right font-semibold text-gray-900">
+                      {formatCurrency(item.amount)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </Card>
+      </div>
       {/* Estoque baixo + inadimplentes */}
       <div className="grid gap-6 lg:grid-cols-2">
         <Card
