@@ -37,6 +37,7 @@ export default function NewProductPage({ params }: { params: Promise<{ storeId: 
     unit: "un",
     baseProductId: "",
     conversionFactor: "",
+    notifyLowStock: true,
   });
 
   useEffect(() => {
@@ -67,6 +68,7 @@ export default function NewProductPage({ params }: { params: Promise<{ storeId: 
         stock: isDerived ? 0 : Number(form.stock) || 0,
         minStock: Number(form.minStock) || 0,
         unit: form.unit,
+        notifyLowStock: form.notifyLowStock,
       };
       if (isDerived) {
         body.baseProductId = form.baseProductId;
@@ -144,6 +146,19 @@ export default function NewProductPage({ params }: { params: Promise<{ storeId: 
             />
             <Input label="Estoque Mínimo" type="number" step="0.01" min="0" value={form.minStock} onChange={(e) => updateField("minStock", e.target.value)} />
             <Input label="Unidade" value={form.unit} onChange={(e) => updateField("unit", e.target.value)} />
+          </div>
+
+          <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
+            <input
+              id="notify-low-stock"
+              type="checkbox"
+              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              checked={form.notifyLowStock}
+              onChange={(e) => updateField("notifyLowStock", e.target.checked.toString())}
+            />
+            <label htmlFor="notify-low-stock" className="cursor-pointer text-gray-700">
+              Notificar quando o estoque deste produto estiver abaixo do mínimo
+            </label>
           </div>
 
           <Button type="submit" loading={loading} className="w-full">

@@ -6,6 +6,8 @@
 import { useEffect, useState } from "react";
 import { MetricCard } from "@/components/ui/metric-card";
 import { Card } from "@/components/ui/card";
+import { Modal } from "@/components/ui/modal";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/utils";
 import { DollarSign, Package, Users, AlertTriangle, TrendingUp } from "lucide-react";
 import type { OwnerDashboardData } from "@/services/dashboard.service";
@@ -32,6 +34,7 @@ export function OwnerDashboardClient({ storeId, initialData }: OwnerDashboardCli
   const [from, setFrom] = useState<string>("");
   const [to, setTo] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const [showLowStockModal, setShowLowStockModal] = useState(false);
 
   async function fetchData(nextFrom?: string, nextTo?: string) {
     setLoading(true);
@@ -74,6 +77,9 @@ export function OwnerDashboardClient({ storeId, initialData }: OwnerDashboardCli
     handleCurrentMonth();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId]);
+
+  const lowStockPreview = data.lowStockProducts.slice(0, 5);
+  const hasMoreLowStock = data.lowStockProducts.length > lowStockPreview.length;
 
   return (
     <div>
@@ -187,26 +193,53 @@ export function OwnerDashboardClient({ storeId, initialData }: OwnerDashboardCli
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         {/* Low stock alert */}
-        <Card title="Estoque Baixo" description="Produtos abaixo do estoque mínimo">
+        <Card
+          title="Estoque Baixo"
+          description="Produtos simples com estoque atual abaixo ou igual ao estoque mínimo configurado."
+          action={
+            data.lowStockProducts.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setShowLowStockModal(true)}
+                className="text-xs font-medium text-blue-600 hover:text-blue-700"
+              >
+                Ver todos
+              </button>
+            ) : null
+          }
+        >
           {data.lowStockProducts.length === 0 ? (
-            <p className="text-sm text-gray-500">Nenhum produto com estoque baixo</p>
+            <p className="text-sm text-gray-500">Nenhum produto com estoque baixo.</p>
           ) : (
-            <ul className="space-y-2">
-              {data.lowStockProducts.map((product) => (
-                <li
-                  key={product.id}
-                  className="flex items-center justify-between rounded-lg bg-yellow-50 p-3"
+            <div className="space-y-2">
+              <ul className="space-y-2">
+                {lowStockPreview.map((product) => (
+                  <li
+                    key={product.id}
+                    className="flex items-center justify-between rounded-lg bg-yellow-50 p-3"
+                  >
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle size={16} className="text-yellow-600" />
+                      <span className="text-sm font-medium text-gray-900">
+                        {product.name}
+                      </span>
+                    </div>
+                    <span className="text-sm text-yellow-700">
+                      {product.stock} / {product.minStock}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              {hasMoreLowStock && (
+                <button
+                  type="button"
+                  onClick={() => setShowLowStockModal(true)}
+                  className="text-xs font-medium text-blue-600 hover:text-blue-700"
                 >
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle size={16} className="text-yellow-600" />
-                    <span className="text-sm font-medium text-gray-900">{product.name}</span>
-                  </div>
-                  <span className="text-sm text-yellow-700">
-                    {product.stock} / {product.minStock}
-                  </span>
-                </li>
-              ))}
-            </ul>
+                  Ver mais ({data.lowStockProducts.length - lowStockPreview.length})
+                </button>
+              )}
+            </div>
           )}
         </Card>
 
@@ -229,6 +262,36 @@ export function OwnerDashboardClient({ storeId, initialData }: OwnerDashboardCli
           )}
         </Card>
       </div>
+
+      <Modal
+        isOpen={showLowStockModal}
+        onClose={() => setShowLowStockModal(false)}
+        title="Produtos com estoque baixo"
+        size="lg"
+      >
+        {data.lowStockProducts.length === 0 ? (
+          <p className="text-sm text-gray-500">Nenhum produto com estoque baixo.</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Produto</TableHead>
+                <TableHead className="text-right">Estoque atual</TableHead>
+                <TableHead className="text-right">Estoque mínimo</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.lowStockProducts.map((product) => (
+                <TableRow key={product.id}>
+                  <TableCell>{product.name}</TableCell>
+                  <TableCell className="text-right">{product.stock}</TableCell>
+                  <TableCell className="text-right">{product.minStock}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Modal>
     </div>
   );
 }

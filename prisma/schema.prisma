@@ -100,6 +100,9 @@ model Product {
   minStock         Float    @default(0)
   unit             String   @default("un")
   isActive         Boolean  @default(true)
+  /// Quando true, o produto pode gerar alerta de estoque baixo.
+  /// É considerado apenas para produtos simples (sem base e sem ingredientes).
+  notifyLowStock   Boolean  @default(true)
   baseProductId    String?
   conversionFactor Float?
   createdAt        DateTime @default(now())

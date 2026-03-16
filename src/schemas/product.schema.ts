@@ -13,6 +13,9 @@ const baseProductObjectSchema = z.object({
   stock: z.number().min(0, "Estoque não pode ser negativo"),
   minStock: z.number().min(0, "Estoque mínimo não pode ser negativo"),
   unit: z.string().default("un"),
+  // Flag para indicar se o produto deve participar de alertas de estoque baixo.
+  // Para produtos derivados/receita, essa flag é ignorada nas consultas.
+  notifyLowStock: z.boolean().default(true),
   baseProductId: z.string().optional(),
   conversionFactor: z.number().positive("Fator deve ser maior que zero").optional(),
 });

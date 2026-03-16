@@ -134,6 +134,7 @@ export const productRepository = {
       where: {
         storeId,
         isActive: true,
+        notifyLowStock: true,
         baseProductId: null,
         derivedProducts: { none: {} },
         ingredients: { none: {} },

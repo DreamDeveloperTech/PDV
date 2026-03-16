@@ -27,6 +27,7 @@ interface ProductResponse {
   unit: string;
   baseProductId?: string | null;
   conversionFactor?: number | null;
+  notifyLowStock: boolean;
 }
 
 interface ProductOption {
@@ -68,6 +69,7 @@ export default function EditProductPage({
     unit: "un",
     baseProductId: "",
     conversionFactor: "",
+    notifyLowStock: true,
   });
   const [currentStock, setCurrentStock] = useState<number | null>(null);
   const [products, setProducts] = useState<ProductOption[]>([]);
@@ -98,6 +100,7 @@ export default function EditProductPage({
           unit: response.unit ?? "un",
           baseProductId: response.baseProductId ?? "",
           conversionFactor: response.conversionFactor != null ? String(response.conversionFactor) : "",
+          notifyLowStock: response.notifyLowStock ?? true,
         });
         setCurrentStock(response.stock);
 
@@ -144,6 +147,7 @@ export default function EditProductPage({
         price: form.price ? Number(form.price) : undefined,
         minStock: form.minStock ? Number(form.minStock) : undefined,
         unit: form.unit || undefined,
+        notifyLowStock: form.notifyLowStock,
       };
       if (isDerived) {
         body.baseProductId = form.baseProductId;
@@ -311,6 +315,21 @@ export default function EditProductPage({
                 value={form.unit}
                 onChange={(e) => updateField("unit", e.target.value)}
               />
+            </div>
+
+            <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
+              <input
+                id="notify-low-stock"
+                type="checkbox"
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                checked={form.notifyLowStock}
+                onChange={(e) =>
+                  updateField("notifyLowStock", e.target.checked.toString())
+                }
+              />
+              <label htmlFor="notify-low-stock" className="cursor-pointer text-gray-700">
+                Notificar quando o estoque deste produto estiver abaixo do mínimo
+              </label>
             </div>
 
             <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-3">
