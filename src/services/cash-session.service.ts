@@ -89,6 +89,34 @@ export const cashSessionService = {
     };
   },
 
+  /**
+   * Registra um reforço de caixa (entrada manual de dinheiro não vinculada a vendas).
+   * Para manter o modelo simples, o valor é somado ao openingAmount da sessão atual.
+   */
+  async addCashToSession(storeId: string, sessionId: string, amount: number, notes?: string) {
+    const session = await cashSessionRepository.findById(sessionId);
+    if (!session) {
+      throw new NotFoundError("Sessão de caixa");
+    }
+    if (session.storeId !== storeId) {
+      throw new ValidationError("Sessão não pertence a esta loja");
+    }
+    if (session.status !== "OPEN") {
+      throw new BusinessRuleError("Esta sessão de caixa já está fechada");
+    }
+    if (amount <= 0) {
+      throw new ValidationError("Valor do reforço deve ser maior que zero");
+    }
+
+    await cashSessionRepository.incrementOpeningAmount(sessionId, amount, notes);
+    // Recalcula dados derivados (expectedCash, sangrias, etc.)
+    const updated = await this.getOpenSession(storeId);
+    if (!updated) {
+      throw new BusinessRuleError("Falha ao obter sessão após reforço de caixa");
+    }
+    return updated;
+  },
+
   async registerWithdrawal(
     storeId: string,
     sessionId: string,

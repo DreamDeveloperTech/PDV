@@ -71,4 +71,16 @@ export const cashSessionRepository = {
       },
     });
   },
+
+  async incrementOpeningAmount(id: string, amountToAdd: number, notes?: string): Promise<CashSession> {
+    return prisma.cashSession.update({
+      where: { id },
+      data: {
+        openingAmount: {
+          increment: amountToAdd,
+        },
+        notes,
+      },
+    });
+  },
 };

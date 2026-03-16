@@ -124,10 +124,13 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
   const [openSessionModal, setOpenSessionModal] = useState(false);
   const [closeSessionModal, setCloseSessionModal] = useState(false);
   const [sangriaModal, setSangriaModal] = useState(false);
+  const [depositModal, setDepositModal] = useState(false);
   const [openingAmount, setOpeningAmount] = useState("0");
   const [closingAmount, setClosingAmount] = useState("0");
   const [sangriaAmount, setSangriaAmount] = useState("");
+  const [depositAmount, setDepositAmount] = useState("");
   const [sangriaLoading, setSangriaLoading] = useState(false);
+  const [depositLoading, setDepositLoading] = useState(false);
   const [selectedWithdrawalUserId, setSelectedWithdrawalUserId] = useState("");
   const [storeMembers, setStoreMembers] = useState<StoreMember[]>([]);
   const [saleLoading, setSaleLoading] = useState(false);
@@ -211,12 +214,12 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
 
   // Carrega membros da loja ao abrir o modal de sangria (para o select "Quem está retirando")
   useEffect(() => {
-    if (!sangriaModal || !storeId) return;
+    if ((!sangriaModal && !depositModal) || !storeId) return;
     fetch(`/api/store-users?storeId=${storeId}`)
       .then((res) => res.json())
       .then((json) => setStoreMembers(json.data ?? []))
       .catch(() => setStoreMembers([]));
-  }, [sangriaModal, storeId]);
+  }, [sangriaModal, depositModal, storeId]);
 
   // Cart calculations
   const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
@@ -435,6 +438,30 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
     }
   }
 
+  async function handleDeposit() {
+    if (!session || !depositAmount || Number(depositAmount) <= 0) return;
+    const amount = Number(depositAmount);
+    setDepositLoading(true);
+    setError("");
+    try {
+      await apiRequest(`/api/cash-sessions/deposit?storeId=${storeId}`, {
+        method: "POST",
+        body: {
+          sessionId: session.id,
+          amount,
+          notes: undefined,
+        },
+      });
+      setDepositAmount("");
+      setDepositModal(false);
+      fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao registrar reforço de caixa");
+    } finally {
+      setDepositLoading(false);
+    }
+  }
+
   async function handleFinalizeSale() {
     if (!session || cart.length === 0) return;
     if (Math.abs(remaining) > 0.01) {
@@ -585,6 +612,16 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
             >
               <Banknote size={16} className="mr-1" />
               Sangria
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setDepositModal(true);
+              }}
+            >
+              <Banknote size={16} className="mr-1 rotate-180" />
+              Reforço
             </Button>
             {session.isExpiredForSales ? (
               <Badge variant="danger">Caixa &gt; 24h – vendas bloqueadas</Badge>
@@ -991,6 +1028,48 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
             className="w-full"
           >
             Confirmar sangria
+          </Button>
+        </div>
+      </Modal>
+
+      {/* Depósito/Refôrço de caixa modal */}
+      <Modal
+        isOpen={depositModal}
+        onClose={() => {
+          setDepositModal(false);
+          setDepositAmount("");
+          setError("");
+        }}
+        title="Reforço de caixa (entrada de dinheiro)"
+      >
+        <div className="space-y-4">
+          <div className="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
+            <p>
+              <span className="font-medium">Total em caixa atualmente:</span>{" "}
+              {formatCurrency(session.expectedCash ?? session.openingAmount)}
+            </p>
+          </div>
+          <Input
+            label="Valor a adicionar (R$)"
+            type="number"
+            step="0.01"
+            min="0.01"
+            placeholder="0,00"
+            value={depositAmount}
+            onChange={(e) => setDepositAmount(e.target.value)}
+          />
+          {error && (
+            <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">
+              {error}
+            </div>
+          )}
+          <Button
+            onClick={handleDeposit}
+            loading={depositLoading}
+            disabled={!depositAmount || Number(depositAmount) <= 0}
+            className="w-full"
+          >
+            Confirmar reforço
           </Button>
         </div>
       </Modal>
