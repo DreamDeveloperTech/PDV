@@ -595,41 +595,48 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
       )}
       {/* Left: Product search and grid */}
       <div className="flex min-w-0 flex-col overflow-hidden">
-        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-xl font-bold text-gray-900">PDV</h1>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="rounded-lg bg-gray-100 px-3 py-1.5 text-sm text-gray-700">
-              <span className="font-medium">Em caixa:</span>{" "}
+        <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="text-lg font-semibold text-gray-900">PDV</h1>
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1 text-gray-700">
+              <span className="font-medium mr-1">Em caixa:</span>
               {formatCurrency(session.expectedCash ?? session.openingAmount)}
-            </div>
+            </span>
             <Button
-              variant="secondary"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setDepositModal(true);
+              }}
+              className="px-2 py-1 text-xs"
+            >
+              <Banknote size={14} className="mr-1 rotate-180" />
+              Reforço
+            </Button>
+            <Button
+              variant="ghost"
               size="sm"
               onClick={() => {
                 setSangriaModal(true);
                 setSelectedWithdrawalUserId(session?.currentUserId ?? "");
               }}
+              className="px-2 py-1 text-xs"
             >
-              <Banknote size={16} className="mr-1" />
+              <Banknote size={14} className="mr-1" />
               Sangria
             </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => {
-                setDepositModal(true);
-              }}
-            >
-              <Banknote size={16} className="mr-1 rotate-180" />
-              Reforço
-            </Button>
             {session.isExpiredForSales ? (
-              <Badge variant="danger">Caixa &gt; 24h – vendas bloqueadas</Badge>
+              <Badge variant="danger">Caixa &gt; 24h</Badge>
             ) : (
               <Badge variant="success">Caixa Aberto</Badge>
             )}
             {session.canCloseSession && (
-              <Button variant="danger" size="sm" onClick={() => setCloseSessionModal(true)}>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() => setCloseSessionModal(true)}
+                className="px-3 py-1 text-xs"
+              >
                 Fechar Caixa
               </Button>
             )}

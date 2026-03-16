@@ -184,20 +184,26 @@ export function OwnerDashboardClient({ storeId, initialData }: OwnerDashboardCli
             Nenhuma venda no período selecionado.
           </p>
         ) : (
-          <div className="space-y-2">
-            {data.paymentMethodsSummary.map((item) => (
-              <div
-                key={item.method}
-                className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2"
-              >
-                <span className="text-sm text-gray-700">
-                  {PAYMENT_METHOD_LABELS[item.method] || item.method}
-                </span>
-                <span className="text-sm font-semibold text-gray-900">
-                  {formatCurrency(item.amount)}
-                </span>
-              </div>
-            ))}
+          <div className="overflow-hidden rounded-lg border border-gray-200">
+            <div className="grid grid-cols-[1fr_auto] bg-gray-50 px-3 py-1.5 text-xs font-medium uppercase tracking-wide text-gray-500">
+              <span>Forma de pagamento</span>
+              <span className="text-right">Receita</span>
+            </div>
+            <ul className="divide-y divide-gray-100 bg-white">
+              {data.paymentMethodsSummary.map((item) => (
+                <li
+                  key={item.method}
+                  className="grid grid-cols-[1fr_auto] items-center px-3 py-1.5 text-sm"
+                >
+                  <span className="text-gray-700">
+                    {PAYMENT_METHOD_LABELS[item.method] || item.method}
+                  </span>
+                  <span className="text-right font-semibold text-gray-900">
+                    {formatCurrency(item.amount)}
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </Card>
