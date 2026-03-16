@@ -174,13 +174,13 @@ export function OwnerDashboardClient({ storeId, initialData }: OwnerDashboardCli
         />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-
+      {/* Cards secundários: receita por forma de pagamento, estoque baixo, inadimplentes */}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         {/* Receita por forma de pagamento */}
         <Card
           title="Receita por forma de pagamento"
           description="Valores recebidos por meio de pagamento no período selecionado."
-          className="mt-2"
+          className="h-full"
         >
           {data.paymentMethodsSummary.length === 0 ? (
             <p className="text-sm text-gray-500">
@@ -210,9 +210,8 @@ export function OwnerDashboardClient({ storeId, initialData }: OwnerDashboardCli
             </div>
           )}
         </Card>
-      </div>
-      {/* Estoque baixo + inadimplentes */}
-      <div className="grid gap-6 lg:grid-cols-2">
+
+        {/* Estoque baixo */}
         <Card
           title="Estoque Baixo"
           description="Produtos simples com estoque atual abaixo ou igual ao estoque mínimo configurado."
@@ -267,6 +266,7 @@ export function OwnerDashboardClient({ storeId, initialData }: OwnerDashboardCli
           )}
         </Card>
 
+        {/* Clientes inadimplentes */}
         <Card
           title="Clientes Inadimplentes"
           description="Clientes bloqueados por excesso de crédito."
