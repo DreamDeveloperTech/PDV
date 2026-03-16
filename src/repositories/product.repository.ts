@@ -126,8 +126,8 @@ export const productRepository = {
 
   /**
    * Find products with stock at or below minStock.
-   * Excludes: derivados (have baseProductId), bases (have derivedProducts), kits (have ingredients).
-   * Includes: produtos simples e ingredientes (ex.: os 3 ingredientes de "dose") — estes devem aparecer.
+   * Considera apenas produtos com notifyLowStock = true.
+   * A regra de “não notificar derivados/doses/etc.” é controlada pelo próprio flag.
    */
   async findLowStock(storeId: string): Promise<Product[]> {
     const products = await prisma.product.findMany({
@@ -135,9 +135,6 @@ export const productRepository = {
         storeId,
         isActive: true,
         notifyLowStock: true,
-        baseProductId: null,
-        derivedProducts: { none: {} },
-        ingredients: { none: {} },
       },
       orderBy: { stock: "asc" },
     });
