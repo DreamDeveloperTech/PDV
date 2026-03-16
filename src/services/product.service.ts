@@ -85,16 +85,13 @@ export const productService = {
     return productRepository.update(id, input);
   },
 
-  /** Hard delete product. Only MASTER/OWNER. Blocks if product has sales, is ingredient of another, or has derived products. */
+  /** Exclui (inativa) um produto. Só MASTER/OWNER via API de admin. */
   async deleteProduct(storeId: string, productId: string): Promise<Product> {
     const product = await productRepository.findById(productId);
     if (!product) throw new NotFoundError("Produto");
     if (product.storeId !== storeId) throw new ValidationError("Produto não pertence a esta loja");
 
     const constraints = await productRepository.getDeleteConstraints(productId);
-    if (constraints.saleItems > 0) {
-      throw new BusinessRuleError("Não é possível excluir: o produto possui vendas no histórico.");
-    }
     if (constraints.usedAsIngredient > 0) {
       throw new BusinessRuleError("Não é possível excluir: o produto é ingrediente de outro produto.");
     }
@@ -102,7 +99,7 @@ export const productService = {
       throw new BusinessRuleError("Não é possível excluir: existem produtos derivados deste.");
     }
 
-    return productRepository.delete(productId);
+    return productRepository.softDelete(productId);
   },
 
   async getProductIngredients(productId: string) {

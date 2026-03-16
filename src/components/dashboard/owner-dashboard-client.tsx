@@ -216,6 +216,7 @@ export function OwnerDashboardClient({ storeId, initialData }: OwnerDashboardCli
         <Card
           title="Estoque Baixo"
           description="Produtos simples com estoque atual abaixo ou igual ao estoque mínimo configurado."
+          className="h-full"
           action={
             data.lowStockProducts.length > 0 ? (
               <button
@@ -256,7 +257,7 @@ export function OwnerDashboardClient({ storeId, initialData }: OwnerDashboardCli
                 <button
                   type="button"
                   onClick={() => setShowLowStockModal(true)}
-                  className="text-xs font-medium text-blue-600 hover:text-blue-700"
+                  className="ml-auto block text-xs font-medium text-blue-600 hover:text-blue-700"
                 >
                   Ver mais (
                   {data.lowStockProducts.length - lowStockPreview.length})
@@ -269,6 +270,7 @@ export function OwnerDashboardClient({ storeId, initialData }: OwnerDashboardCli
         <Card
           title="Clientes Inadimplentes"
           description="Clientes bloqueados por excesso de crédito."
+          className="h-full"
         >
           {data.defaulters.length === 0 ? (
             <p className="text-sm text-gray-500">

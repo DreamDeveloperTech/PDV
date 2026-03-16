@@ -91,10 +91,11 @@ export const productRepository = {
     });
   },
 
-  /** Hard delete: remove product. Fails if product has sales, is used as ingredient, or has derived products. */
-  async delete(id: string): Promise<Product> {
-    return prisma.product.delete({
+  /** Soft delete: marca o produto como inativo sem remover histórico. */
+  async softDelete(id: string): Promise<Product> {
+    return prisma.product.update({
       where: { id },
+      data: { isActive: false },
     });
   },
 
