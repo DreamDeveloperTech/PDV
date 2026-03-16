@@ -175,7 +175,7 @@ export function OwnerDashboardClient({ storeId, initialData }: OwnerDashboardCli
       </div>
 
       {/* Cards secundários: receita por forma de pagamento, estoque baixo, inadimplentes */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-2">
         {/* Receita por forma de pagamento */}
         <Card
           title="Receita por forma de pagamento"
