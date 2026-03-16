@@ -7,7 +7,6 @@ import { useEffect, useState } from "react";
 import { MetricCard } from "@/components/ui/metric-card";
 import { Card } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/utils";
 import { DollarSign, Package, Users, AlertTriangle, TrendingUp } from "lucide-react";
 import type { OwnerDashboardData } from "@/services/dashboard.service";
@@ -82,55 +81,66 @@ export function OwnerDashboardClient({ storeId, initialData }: OwnerDashboardCli
   const hasMoreLowStock = data.lowStockProducts.length > lowStockPreview.length;
 
   return (
-    <div>
-      <div className="mb-4 flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
+    <div className="mx-auto max-w-6xl space-y-6">
+      {/* Header + filtros */}
+      <div className="flex flex-col gap-4 rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-1">
+          <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">
+            Visão geral da loja
+          </p>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-xs text-gray-500">
-            Filtros por dia ou mês aplicam-se à{" "}
-            <span className="font-semibold">Receita no Período</span>.
+            Os filtros de data afetam apenas a{" "}
+            <span className="font-semibold">Receita no Período</span> e os
+            resumos de formas de pagamento.
           </p>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-          <div className="flex gap-2">
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="flex gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">De</label>
+              <label className="mb-1 block text-xs font-medium text-gray-600">
+                De
+              </label>
               <input
                 type="date"
                 value={from}
                 onChange={(e) => setFrom(e.target.value)}
-                className="rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-[140px] rounded-md border border-gray-300 px-2 py-1.5 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Até</label>
+              <label className="mb-1 block text-xs font-medium text-gray-600">
+                Até
+              </label>
               <input
                 type="date"
                 value={to}
                 onChange={(e) => setTo(e.target.value)}
-                className="rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-[140px] rounded-md border border-gray-300 px-2 py-1.5 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
           </div>
+
           <div className="flex gap-2">
             <button
               type="button"
               onClick={handleApplyFilter}
-              className="mt-1 inline-flex items-center rounded-md bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700"
+              className="inline-flex items-center rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-blue-700"
             >
               {loading ? "Carregando..." : "Aplicar"}
             </button>
             <button
               type="button"
               onClick={handleToday}
-              className="mt-1 inline-flex items-center rounded-md border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
+              className="inline-flex items-center rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100"
             >
               Hoje
             </button>
             <button
               type="button"
               onClick={handleCurrentMonth}
-              className="mt-1 inline-flex items-center rounded-md border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
+              className="inline-flex items-center rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100"
             >
               Mês atual
             </button>
@@ -138,8 +148,8 @@ export function OwnerDashboardClient({ storeId, initialData }: OwnerDashboardCli
         </div>
       </div>
 
-      {/* Metrics grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Métricas principais */}
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           title="Receita Total"
           value={formatCurrency(data.storeRevenue)}
@@ -163,36 +173,37 @@ export function OwnerDashboardClient({ storeId, initialData }: OwnerDashboardCli
         />
       </div>
 
-      {/* Payment methods summary */}
-      <div className="mt-6">
-        <Card
-          title="Receita por forma de pagamento"
-          description="Valores recebidos por meio de pagamento no período selecionado"
-        >
-          {data.paymentMethodsSummary.length === 0 ? (
-            <p className="text-sm text-gray-500">Nenhuma venda no período selecionado.</p>
-          ) : (
-            <ul className="space-y-2">
-              {data.paymentMethodsSummary.map((item) => (
-                <li
-                  key={item.method}
-                  className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2"
-                >
-                  <span className="text-sm text-gray-700">
-                    {PAYMENT_METHOD_LABELS[item.method] || item.method}
-                  </span>
-                  <span className="text-sm font-semibold text-gray-900">
-                    {formatCurrency(item.amount)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      </div>
+      {/* Receita por forma de pagamento */}
+      <Card
+        title="Receita por forma de pagamento"
+        description="Valores recebidos por meio de pagamento no período selecionado."
+        className="mt-2"
+      >
+        {data.paymentMethodsSummary.length === 0 ? (
+          <p className="text-sm text-gray-500">
+            Nenhuma venda no período selecionado.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {data.paymentMethodsSummary.map((item) => (
+              <div
+                key={item.method}
+                className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2"
+              >
+                <span className="text-sm text-gray-700">
+                  {PAYMENT_METHOD_LABELS[item.method] || item.method}
+                </span>
+                <span className="text-sm font-semibold text-gray-900">
+                  {formatCurrency(item.amount)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        {/* Low stock alert */}
+      {/* Estoque baixo + inadimplentes */}
+      <div className="grid gap-6 lg:grid-cols-2">
         <Card
           title="Estoque Baixo"
           description="Produtos simples com estoque atual abaixo ou igual ao estoque mínimo configurado."
@@ -209,7 +220,9 @@ export function OwnerDashboardClient({ storeId, initialData }: OwnerDashboardCli
           }
         >
           {data.lowStockProducts.length === 0 ? (
-            <p className="text-sm text-gray-500">Nenhum produto com estoque baixo.</p>
+            <p className="text-sm text-gray-500">
+              Nenhum produto com estoque baixo.
+            </p>
           ) : (
             <div className="space-y-2">
               <ul className="space-y-2">
@@ -236,17 +249,22 @@ export function OwnerDashboardClient({ storeId, initialData }: OwnerDashboardCli
                   onClick={() => setShowLowStockModal(true)}
                   className="text-xs font-medium text-blue-600 hover:text-blue-700"
                 >
-                  Ver mais ({data.lowStockProducts.length - lowStockPreview.length})
+                  Ver mais (
+                  {data.lowStockProducts.length - lowStockPreview.length})
                 </button>
               )}
             </div>
           )}
         </Card>
 
-        {/* Defaulters */}
-        <Card title="Clientes Inadimplentes" description="Clientes bloqueados por excesso de crédito">
+        <Card
+          title="Clientes Inadimplentes"
+          description="Clientes bloqueados por excesso de crédito."
+        >
           {data.defaulters.length === 0 ? (
-            <p className="text-sm text-gray-500">Nenhum cliente inadimplente</p>
+            <p className="text-sm text-gray-500">
+              Nenhum cliente inadimplente no momento.
+            </p>
           ) : (
             <ul className="space-y-2">
               {data.defaulters.map((customer) => (
@@ -255,7 +273,9 @@ export function OwnerDashboardClient({ storeId, initialData }: OwnerDashboardCli
                   className="flex items-center gap-2 rounded-lg bg-red-50 p-3"
                 >
                   <Users size={16} className="text-red-600" />
-                  <span className="text-sm font-medium text-gray-900">{customer.name}</span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {customer.name}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -272,24 +292,24 @@ export function OwnerDashboardClient({ storeId, initialData }: OwnerDashboardCli
         {data.lowStockProducts.length === 0 ? (
           <p className="text-sm text-gray-500">Nenhum produto com estoque baixo.</p>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Produto</TableHead>
-                <TableHead className="text-right">Estoque atual</TableHead>
-                <TableHead className="text-right">Estoque mínimo</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.lowStockProducts.map((product) => (
-                <TableRow key={product.id}>
-                  <TableCell>{product.name}</TableCell>
-                  <TableCell className="text-right">{product.stock}</TableCell>
-                  <TableCell className="text-right">{product.minStock}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <div className="max-h-[60vh] space-y-2 overflow-y-auto">
+            {data.lowStockProducts.map((product) => (
+              <div
+                key={product.id}
+                className="flex items-center justify-between rounded-lg bg-yellow-50 px-4 py-2"
+              >
+                <div className="flex items-center gap-2">
+                  <AlertTriangle size={16} className="text-yellow-600" />
+                  <span className="text-sm font-medium text-gray-900">
+                    {product.name}
+                  </span>
+                </div>
+                <span className="text-sm text-yellow-700">
+                  {product.stock} / {product.minStock}
+                </span>
+              </div>
+            ))}
+          </div>
         )}
       </Modal>
     </div>
