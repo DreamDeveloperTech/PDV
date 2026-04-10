@@ -324,7 +324,7 @@ export default function EditProductPage({
                 className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 checked={form.notifyLowStock}
                 onChange={(e) =>
-                  updateField("notifyLowStock", e.target.checked.toString())
+                  setForm((prev) => ({ ...prev, notifyLowStock: e.target.checked }))
                 }
               />
               <label htmlFor="notify-low-stock" className="cursor-pointer text-gray-700">
