@@ -11,7 +11,7 @@ import { Select } from "@/components/ui/select";
 import { Modal } from "@/components/ui/modal";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/hooks/use-fetch";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatDateTime } from "@/lib/utils";
 import { savePdvSession, loadPdvSession, clearPdvSession } from "@/lib/pdv-storage";
 import {
   ShoppingCart,
@@ -1015,9 +1015,10 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
               <p className="text-sm font-medium text-gray-700 mb-2">Sangrias desta sessão</p>
               <ul className="max-h-32 overflow-y-auto rounded border border-gray-200 divide-y divide-gray-100 text-sm">
                 {session.withdrawals.map((w) => (
-                  <li key={w.id} className="flex justify-between items-center px-3 py-2">
-                    <span className="text-gray-600">{w.user.name || w.user.email}</span>
-                    <span className="font-medium">{formatCurrency(w.amount)}</span>
+                  <li key={w.id} className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-3 py-2">
+                    <span className="text-gray-600 text-xs shrink-0">{formatDateTime(w.createdAt)}</span>
+                    <span className="text-gray-800 min-w-0">{w.user.name || w.user.email}</span>
+                    <span className="font-medium tabular-nums">{formatCurrency(w.amount)}</span>
                   </li>
                 ))}
               </ul>
@@ -1085,12 +1086,53 @@ export default function PosPage({ params }: { params: Promise<{ storeId: string 
       <Modal isOpen={closeSessionModal} onClose={() => setCloseSessionModal(false)} title="Fechar Caixa">
         <div className="space-y-4">
           {session && (
-            <div className="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
-              <p>
-                <span className="font-medium">Deveria haver em caixa:</span>{" "}
-                {formatCurrency(session.expectedCash ?? session.openingAmount)}
-              </p>
-            </div>
+            <>
+              <div className="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
+                <p>
+                  <span className="font-medium">Deveria haver em caixa:</span>{" "}
+                  {formatCurrency(session.expectedCash ?? session.openingAmount)}
+                </p>
+              </div>
+              <div className="rounded-lg border border-gray-200 p-3 text-sm">
+                <p className="font-medium text-gray-800 mb-2">Sangrias nesta sessão</p>
+                {session.withdrawals && session.withdrawals.length > 0 ? (
+                  <>
+                    <ul className="max-h-40 overflow-y-auto space-y-2 text-gray-700">
+                      {session.withdrawals
+                        .slice()
+                        .sort(
+                          (a, b) =>
+                            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+                        )
+                        .map((w) => (
+                          <li
+                            key={w.id}
+                            className="flex flex-wrap items-baseline justify-between gap-2 border-b border-gray-100 pb-2 last:border-0 last:pb-0"
+                          >
+                            <span className="text-xs text-gray-500 shrink-0">
+                              {formatDateTime(w.createdAt)}
+                            </span>
+                            <span className="font-medium text-gray-900 min-w-0">
+                              {w.user.name || w.user.email}
+                            </span>
+                            <span className="font-semibold tabular-nums">
+                              {formatCurrency(w.amount)}
+                            </span>
+                          </li>
+                        ))}
+                    </ul>
+                    <p className="mt-2 text-xs text-gray-600 border-t border-gray-100 pt-2">
+                      Total retirado em sangrias:{" "}
+                      <span className="font-semibold">
+                        {formatCurrency(session.totalWithdrawals ?? 0)}
+                      </span>
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-xs text-gray-500">Nenhuma sangria registrada nesta sessão.</p>
+                )}
+              </div>
+            </>
           )}
           <Input
             label="Valor em Caixa (R$)"

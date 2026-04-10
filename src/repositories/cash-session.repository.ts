@@ -45,6 +45,10 @@ export const cashSessionRepository = {
         include: {
           openedByUser: { select: { id: true, name: true, email: true } },
           closedByUser: { select: { id: true, name: true, email: true } },
+          withdrawals: {
+            orderBy: { createdAt: "asc" },
+            include: { user: { select: { id: true, name: true, email: true } } },
+          },
         },
       }),
       prisma.cashSession.count({ where }),
