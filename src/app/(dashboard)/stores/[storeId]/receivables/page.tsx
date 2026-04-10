@@ -68,6 +68,10 @@ export default function ReceivablesPage({ params }: { params: Promise<{ storeId:
   const [cancelReceivable, setCancelReceivable] = useState<Receivable | null>(null);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [cancelError, setCancelError] = useState("");
+  const [bulkPayGroup, setBulkPayGroup] = useState<CustomerGroup | null>(null);
+  const [bulkPaymentAmount, setBulkPaymentAmount] = useState("");
+  const [bulkPaymentLoading, setBulkPaymentLoading] = useState(false);
+  const [bulkPaymentError, setBulkPaymentError] = useState("");
 
   const fetchReceivables = useCallback(async () => {
     setLoading(true);
@@ -158,6 +162,43 @@ export default function ReceivablesPage({ params }: { params: Promise<{ storeId:
     }
   }
 
+  async function handleBulkPayment(event: React.FormEvent) {
+    event.preventDefault();
+    if (!bulkPayGroup) return;
+    const total = bulkPayGroup.totalOutstanding;
+    const amount = Number(bulkPaymentAmount);
+    if (!Number.isFinite(amount) || amount < 0.01) {
+      setBulkPaymentError("Informe um valor válido");
+      return;
+    }
+    if (amount - total > 0.01) {
+      setBulkPaymentError(`O valor não pode ser maior que o total em aberto (${formatCurrency(total)})`);
+      return;
+    }
+
+    setBulkPaymentLoading(true);
+    setBulkPaymentError("");
+    try {
+      await apiRequest(`/api/receivables/customer-payment?storeId=${storeId}`, {
+        body: {
+          customerId: bulkPayGroup.customerId,
+          amount,
+          paymentMethod: "CASH",
+        },
+      });
+      setBulkPayGroup(null);
+      setBulkPaymentAmount("");
+      setCustomerDetailGroup(null);
+      await fetchReceivables();
+    } catch (err) {
+      setBulkPaymentError(
+        err instanceof Error ? err.message : "Erro ao registrar pagamento em lote"
+      );
+    } finally {
+      setBulkPaymentLoading(false);
+    }
+  }
+
   async function handleCancelReceivableConfirm() {
     if (!cancelReceivable) return;
     setCancelLoading(true);
@@ -210,7 +251,7 @@ export default function ReceivablesPage({ params }: { params: Promise<{ storeId:
               <TableHead>Cliente</TableHead>
               <TableHead className="text-right">Títulos</TableHead>
               <TableHead className="text-right">Total a receber</TableHead>
-              <TableHead className="w-[100px]">Detalhes</TableHead>
+              <TableHead className="text-right w-[200px]">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -226,16 +267,35 @@ export default function ReceivablesPage({ params }: { params: Promise<{ storeId:
                   <TableCell className="text-right font-medium">
                     {formatCurrency(group.totalOutstanding)}
                   </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setCustomerDetailGroup(group)}
-                      title="Ver todas as transações do cliente"
-                    >
-                      <Eye size={14} className="mr-1" />
-                      Ver
-                    </Button>
+                  <TableCell className="text-right">
+                    <div className="flex flex-wrap items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setCustomerDetailGroup(group)}
+                        title="Ver todas as transações do cliente"
+                      >
+                        <Eye size={14} className="mr-1" />
+                        Ver
+                      </Button>
+                      {group.totalOutstanding > 0 && (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => {
+                            setBulkPayGroup(group);
+                            setBulkPaymentAmount(
+                              String(Math.round(group.totalOutstanding * 100) / 100)
+                            );
+                            setBulkPaymentError("");
+                          }}
+                          title="Registrar um pagamento quitando um ou todos os títulos"
+                        >
+                          <DollarSign size={14} className="mr-1" />
+                          Pagar
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -252,10 +312,27 @@ export default function ReceivablesPage({ params }: { params: Promise<{ storeId:
       >
         {customerDetailGroup && (
           <div className="space-y-4">
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm">
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm space-y-2">
               <p><strong>Cliente:</strong> {customerDetailGroup.customerName}</p>
               <p><strong>Total a receber:</strong> {formatCurrency(customerDetailGroup.totalOutstanding)}</p>
               <p><strong>Quantidade de títulos:</strong> {customerDetailGroup.receivables.length}</p>
+              {customerDetailGroup.totalOutstanding > 0 && (
+                <Button
+                  type="button"
+                  size="sm"
+                  className="mt-1"
+                  onClick={() => {
+                    setBulkPayGroup(customerDetailGroup);
+                    setBulkPaymentAmount(
+                      String(Math.round(customerDetailGroup.totalOutstanding * 100) / 100)
+                    );
+                    setBulkPaymentError("");
+                  }}
+                >
+                  <DollarSign size={14} className="mr-1" />
+                  Pagar valor total (quita títulos mais antigos primeiro)
+                </Button>
+              )}
             </div>
             <div className="max-h-[60vh] overflow-y-auto">
               <Table>
@@ -557,6 +634,49 @@ export default function ReceivablesPage({ params }: { params: Promise<{ storeId:
               </Button>
             </div>
           </div>
+        )}
+      </Modal>
+
+      {/* Pagamento em lote por cliente */}
+      <Modal
+        isOpen={!!bulkPayGroup}
+        onClose={() => {
+          setBulkPayGroup(null);
+          setBulkPaymentError("");
+        }}
+        title="Quitar fiado (vários títulos)"
+      >
+        {bulkPayGroup && (
+          <form onSubmit={handleBulkPayment} className="space-y-4">
+            {bulkPaymentError && (
+              <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{bulkPaymentError}</div>
+            )}
+            <div className="rounded-lg bg-gray-50 p-3 text-sm text-gray-700 space-y-1">
+              <p>
+                <strong>Cliente:</strong> {bulkPayGroup.customerName}
+              </p>
+              <p>
+                <strong>Total em aberto:</strong> {formatCurrency(bulkPayGroup.totalOutstanding)}
+              </p>
+              <p className="text-xs text-gray-500 pt-1">
+                O valor será aplicado automaticamente nos títulos em aberto, do mais antigo ao mais
+                novo. Você pode informar um valor menor para pagamento parcial.
+              </p>
+            </div>
+            <Input
+              label="Valor do pagamento (R$)"
+              type="number"
+              step="0.01"
+              min="0.01"
+              max={String(bulkPayGroup.totalOutstanding)}
+              value={bulkPaymentAmount}
+              onChange={(e) => setBulkPaymentAmount(e.target.value)}
+              required
+            />
+            <Button type="submit" loading={bulkPaymentLoading} className="w-full">
+              Confirmar pagamento
+            </Button>
+          </form>
         )}
       </Modal>
 

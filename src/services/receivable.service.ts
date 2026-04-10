@@ -5,8 +5,12 @@
 import { receivableRepository, receivablePaymentRepository } from "@/repositories/receivable.repository";
 import { customerRepository } from "@/repositories/customer.repository";
 import { NotFoundError, BusinessRuleError, ValidationError } from "@/lib/errors";
-import type { ReceivablePaymentInput, UpdateReceivableInput } from "@/schemas/receivable.schema";
-import type { ReceivableStatus } from "@/generated/prisma/client";
+import type {
+  ReceivablePaymentInput,
+  CustomerBulkPaymentInput,
+  UpdateReceivableInput,
+} from "@/schemas/receivable.schema";
+import type { AccountReceivable, ReceivableStatus } from "@/generated/prisma/client";
 
 export const receivableService = {
   async getReceivables(storeId: string, options?: { status?: ReceivableStatus; page?: number; pageSize?: number }) {
@@ -116,6 +120,64 @@ export const receivableService = {
     }
 
     return updated;
+  },
+
+  /**
+   * Registra um pagamento único e distribui entre os títulos em aberto do cliente (mais antigos primeiro).
+   * Permite quitar o saldo total de uma vez ou um valor parcial.
+   */
+  async registerCustomerBulkPayment(storeId: string, input: CustomerBulkPaymentInput) {
+    const customer = await customerRepository.findById(input.customerId);
+    if (!customer || customer.storeId !== storeId) {
+      throw new ValidationError("Cliente não encontrado para esta loja");
+    }
+
+    const totalOutstanding = await receivableRepository.sumOutstandingByStoreAndCustomer(
+      storeId,
+      input.customerId
+    );
+
+    if (totalOutstanding < 0.01) {
+      throw new BusinessRuleError("Não há saldo em aberto para este cliente");
+    }
+
+    if (input.amount - totalOutstanding > 0.01) {
+      throw new ValidationError(
+        `Valor do pagamento (R$ ${input.amount.toFixed(2)}) excede o total em aberto (R$ ${totalOutstanding.toFixed(2)})`
+      );
+    }
+
+    const titles = await receivableRepository.findOpenPartialByStoreAndCustomer(
+      storeId,
+      input.customerId
+    );
+
+    let remaining = input.amount;
+    const allocations: { receivableId: string; amount: number }[] = [];
+    let lastUpdated: AccountReceivable | null = null;
+
+    for (const r of titles) {
+      if (remaining < 0.01) break;
+      const due = r.amount - r.paidAmount;
+      if (due < 0.01) continue;
+      const pay = Math.min(due, remaining);
+      lastUpdated = await this.registerPayment({
+        receivableId: r.id,
+        amount: pay,
+        paymentMethod: input.paymentMethod,
+        notes: input.notes,
+      });
+      allocations.push({ receivableId: r.id, amount: pay });
+      remaining -= pay;
+    }
+
+    await this.checkAndUpdateCreditBlock(input.customerId);
+
+    return {
+      paidTotal: input.amount,
+      allocations,
+      lastReceivable: lastUpdated,
+    };
   },
 
   /**

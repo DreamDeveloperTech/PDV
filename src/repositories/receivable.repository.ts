@@ -127,6 +127,37 @@ export const receivableRepository = {
     return (result._sum.amount ?? 0) - (result._sum.paidAmount ?? 0);
   },
 
+  /** Saldo em aberto do cliente apenas nesta loja (escopo correto para pagamento em lote) */
+  async sumOutstandingByStoreAndCustomer(
+    storeId: string,
+    customerId: string
+  ): Promise<number> {
+    const result = await prisma.accountReceivable.aggregate({
+      where: {
+        storeId,
+        customerId,
+        status: { in: ["OPEN", "PARTIAL"] },
+      },
+      _sum: { amount: true, paidAmount: true },
+    });
+    return (result._sum.amount ?? 0) - (result._sum.paidAmount ?? 0);
+  },
+
+  /** Títulos em aberto ou parcial, do mais antigo ao mais novo (quitação em lote FIFO) */
+  async findOpenPartialByStoreAndCustomer(
+    storeId: string,
+    customerId: string
+  ): Promise<AccountReceivable[]> {
+    return prisma.accountReceivable.findMany({
+      where: {
+        storeId,
+        customerId,
+        status: { in: ["OPEN", "PARTIAL"] },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+  },
+
   /** Sum of all outstanding receivables for a store */
   async sumOutstandingByStore(storeId: string): Promise<number> {
     const result = await prisma.accountReceivable.aggregate({
