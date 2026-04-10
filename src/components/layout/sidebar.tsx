@@ -51,7 +51,7 @@ export function Sidebar({ storeId, storeName, role, userName }: SidebarProps) {
     },
     {
       href: `/stores/${storeId}/cash-sessions`,
-      label: "Fechamentos de Caixa",
+      label: "Histórico de Caixa",
       icon: <Banknote size={20} />,
       roles: ["MASTER", "OWNER"],
     },
